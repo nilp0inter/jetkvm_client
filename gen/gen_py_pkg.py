@@ -14,6 +14,7 @@ def read_jetkvm_control_files(src_dir: str) -> dict:
     for root, dirs, files in os.walk(src_dir):
         # Exclude .git directory
         dirs[:] = [d for d in dirs if d != ".git"]
+        dirs[:] = [d for d in dirs if d != "target"]
         for file in files:
             full_path = os.path.join(root, file)
             # Create a relative path that includes the top-level directory name

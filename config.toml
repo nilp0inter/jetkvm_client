@@ -1,5 +1,5 @@
-host = ""
-password = ""
+host = "192.168.254.128"
 port = "80"
 api = "/webrtc/session"
+password = "xyz"
 
