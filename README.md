@@ -78,6 +78,27 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
     send_ctrl_v(&client).await.ok();
    ```
 
+
+---
+
+## **Configuration Loading Precedence**
+The configuration file (`config.toml`) is loaded based on the following priority order:
+
+### **📌 Priority Order**
+| Priority | macOS/Linux                  | Windows                                  |
+|----------|------------------------------|------------------------------------------|
+| 1️⃣ **(Highest)** | `config.toml` (Current Directory) | `config.toml` (Current Directory) |
+| 2️⃣ | `${CARGO_MANIFEST_DIR}/config.toml` | `${CARGO_MANIFEST_DIR}/config.toml` |
+| 3️⃣ **(System-Wide)** | `/etc/jetkvm_control/config.toml` | `%APPDATA%\jetkvm_control\config.toml` |
+
+### **📍 How Configuration is Resolved**
+- **Current Directory (`config.toml`)** – Preferred for local development.
+- **Cargo Project Root (`CARGO_MANIFEST_DIR/config.toml`)** – Used when running inside a Rust project.
+- **System-Wide Location (`/etc/jetkvm_control/config.toml` or `%APPDATA%\jetkvm_control\config.toml`)** – Used when no local config is found.
+
+If no configuration file is found, the program exits with an error message.
+
+
 ## WebRTC and SRTP Patching
 
 JetKVM **relies heavily on WebRTC** for real-time communication, but we encountered several issues that required **custom patches** to the WebRTC Rust implementation. Below is an overview of the changes:
