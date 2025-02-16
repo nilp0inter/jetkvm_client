@@ -49,6 +49,35 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
         - Opens a WebRTC DataChannel,
         - Sends RPC calls to perform actions (e.g., keyboard events, mouse clicks).
 
+## What's it look like
+   ```rust
+    let config = JetKvmConfig::load()?;
+    let mut client = JetKvmRpcClient::new(config);
+
+    if let Err(err) = client.connect().await {
+        error!("Failed to connect to RPC server: {:?}", err);
+        std::process::exit(1);
+    }
+    // open notepad and say Hello World, copy and paste.
+    send_windows_key(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    rpc_sendtext(&client, "notepad").await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_return(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    rpc_sendtext(&client, "Hello World").await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_ctrl_a(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_ctrl_x(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_ctrl_v(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_return(&client).await.ok();
+    sleep(Duration::from_millis(100)).await;
+    send_ctrl_v(&client).await.ok();
+   ```
+
 ## WebRTC and SRTP Patching
 
 JetKVM **relies heavily on WebRTC** for real-time communication, but we encountered several issues that required **custom patches** to the WebRTC Rust implementation. Below is an overview of the changes:
