@@ -49,7 +49,26 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
         - Opens a WebRTC DataChannel,
         - Sends RPC calls to perform actions (e.g., keyboard events, mouse clicks).
 
-## What's it look like
+## What's the cmdline client look like
+
+Right now the client doesn't do anything put ping and display some additional debug.
+
+```
+A control client for JetKVM over WebRTC.
+
+Usage: jetkvm_control [OPTIONS]
+
+Options:
+  -H, --host <HOST>          The host address to connect to
+  -p, --port <PORT>          The port number to use
+  -a, --api <API>            The API endpoint
+  -P, --password <PASSWORD>  The password for authentication
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+## What's the code look like
+
    ```rust
     let config = JetKvmConfig::load()?;
     let mut client = JetKvmRpcClient::new(config);
@@ -78,6 +97,7 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
     send_ctrl_v(&client).await.ok();
    ```
 
+Check out the examples folder for additional detail.
 
 ---
 

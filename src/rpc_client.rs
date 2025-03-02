@@ -71,7 +71,6 @@ impl RpcClient {
     }
 
     pub async fn send_rpc(&self, method: &str, params: Value) -> AnyResult<Value> {
-
         if self.dc.ready_state() != RTCDataChannelState::Open {
             error!("❌ DataChannel not open");
             return Err(anyhow!("DataChannel not open"));

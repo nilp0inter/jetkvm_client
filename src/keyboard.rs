@@ -1,10 +1,10 @@
 use crate::jetkvm_rpc_client::JetKvmRpcClient;
 use anyhow::Result as AnyResult;
 use serde_json::{json, Value};
-use tokio::time::{sleep, Duration};
-use tracing::debug;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
+use tracing::debug;
 
 /// Sends a keyboard report with the given modifier and keys.
 pub async fn rpc_keyboard_report(
@@ -249,7 +249,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_return(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_return(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -260,7 +262,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_ctrl_a(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_ctrl_a(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -271,7 +275,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_ctrl_v(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_ctrl_v(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -282,7 +288,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_ctrl_x(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_ctrl_x(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -293,7 +301,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_ctrl_c(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_ctrl_c(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -304,7 +314,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, ()| {
             let client = client.clone();
             async move {
-                send_windows_key(&*client.lock().await).await.map_err(mlua::Error::external)
+                send_windows_key(&*client.lock().await)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -315,7 +327,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, text: String| {
             let client = client.clone();
             async move {
-                rpc_sendtext(&*client.lock().await, &text).await.map_err(mlua::Error::external)
+                rpc_sendtext(&*client.lock().await, &text)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };

@@ -1,13 +1,12 @@
-#![cfg(feature = "lua")
-]
+#![cfg(feature = "lua")]
 // jetkvm_control/src/lua_engine.rs
 
+use anyhow::Result as AnyResult;
 use mlua::prelude::*;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use anyhow::Result as AnyResult;
-use tokio::time::Duration;
 use tokio::time::sleep;
+use tokio::time::Duration;
 
 use crate::jetkvm_rpc_client::JetKvmRpcClient;
 use crate::keyboard;
@@ -46,7 +45,11 @@ impl LuaEngine {
 
     /// Asynchronously executes the provided Lua script.
     pub async fn exec_script(&self, script: &str) -> AnyResult<()> {
-        self.lua.load(script).exec_async().await.map_err(|e| e.into())
+        self.lua
+            .load(script)
+            .exec_async()
+            .await
+            .map_err(|e| e.into())
     }
 
     /// Provides access to the underlying Lua instance.
@@ -54,4 +57,3 @@ impl LuaEngine {
         &self.lua
     }
 }
-

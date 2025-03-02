@@ -42,7 +42,5 @@ async fn main() -> AnyResult<()> {
     sleep(Duration::from_millis(100)).await;
     send_return(&client).await.ok();
 
-
     Ok(())
 }
-

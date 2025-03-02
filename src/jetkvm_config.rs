@@ -1,8 +1,8 @@
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::env;
 use std::fs;
 use std::path::Path;
-use anyhow::{Context, Result};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct JetKvmConfig {
@@ -27,7 +27,7 @@ impl JetKvmConfig {
     pub fn load() -> Result<Self> {
         // Define config file locations based on OS
         let mut config_paths = vec![
-            "config.toml".to_string(),  // First: Check local directory
+            "config.toml".to_string(), // First: Check local directory
         ];
 
         // Check Cargo project root (development mode)
@@ -48,17 +48,18 @@ impl JetKvmConfig {
         }
 
         // Search for the first available config file
-        let config_path = config_paths.iter()
+        let config_path = config_paths
+            .iter()
             .find(|path| Path::new(path).exists())
             .ok_or_else(|| anyhow::anyhow!("No config.toml found in any location"))?;
 
         println!("✅ Loaded config from: {}", config_path);
 
         // Read and deserialize the configuration file
-        let config_contents = fs::read_to_string(config_path)
-            .context("Failed to read config file")?;
-        let config: JetKvmConfig = toml::from_str(&config_contents)
-            .context("Failed to parse config.toml")?;
+        let config_contents =
+            fs::read_to_string(config_path).context("Failed to read config file")?;
+        let config: JetKvmConfig =
+            toml::from_str(&config_contents).context("Failed to parse config.toml")?;
 
         Ok(config)
     }
@@ -67,5 +68,4 @@ impl JetKvmConfig {
     pub fn session_url(&self) -> String {
         format!("http://{}:{}{}", self.host, self.port, self.api)
     }
-
 }

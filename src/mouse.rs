@@ -1,9 +1,9 @@
 use crate::jetkvm_rpc_client::JetKvmRpcClient;
 use anyhow::Result as AnyResult;
 use serde_json::{json, Value};
-use tokio::time::{sleep, Duration};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::time::{sleep, Duration};
 
 /// Sends an absolute mouse report with x, y coordinates and button state.
 pub async fn rpc_abs_mouse_report(
@@ -215,7 +215,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, (x, y): (i64, i64)| {
             let client = client.clone();
             async move {
-                rpc_left_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+                rpc_left_click(&*client.lock().await, x, y)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -226,7 +228,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, (x, y): (i64, i64)| {
             let client = client.clone();
             async move {
-                rpc_right_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+                rpc_right_click(&*client.lock().await, x, y)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -237,7 +241,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, (x, y): (i64, i64)| {
             let client = client.clone();
             async move {
-                rpc_middle_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+                rpc_middle_click(&*client.lock().await, x, y)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -248,7 +254,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, (x, y): (i64, i64)| {
             let client = client.clone();
             async move {
-                rpc_move_mouse(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+                rpc_move_mouse(&*client.lock().await, x, y)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };
@@ -259,7 +267,9 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
         lua.create_async_function(move |_, (x, y): (i64, i64)| {
             let client = client.clone();
             async move {
-                rpc_double_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+                rpc_double_click(&*client.lock().await, x, y)
+                    .await
+                    .map_err(mlua::Error::external)
             }
         })?
     };

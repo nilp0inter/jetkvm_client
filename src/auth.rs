@@ -7,8 +7,8 @@ use tracing::{debug, info};
 pub async fn login_local(host: &str, password: &str) -> AnyResult<Client> {
     let login_url = format!("http://{}/auth/login-local", host);
     let client = Client::builder().cookie_store(true).build()?;
-    if password.len()==0 {
-        return Ok(client)
+    if password.len() == 0 {
+        return Ok(client);
     }
     let resp = client
         .post(&login_url)
