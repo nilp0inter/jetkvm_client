@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 pub async fn rpc_get_edid(client: &JetKvmRpcClient) -> AnyResult<String> {
     let res = client.send_rpc("getEDID", json!({})).await?;
     Ok(res
-        .get("edid")
+        .get("result")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string())

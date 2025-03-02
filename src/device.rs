@@ -11,7 +11,7 @@ pub async fn rpc_ping(client: &JetKvmRpcClient) -> AnyResult<Value> {
 pub async fn rpc_get_device_id(client: &JetKvmRpcClient) -> AnyResult<String> {
     let res = client.send_rpc("getDeviceID", json!({})).await?;
     Ok(res
-        .get("deviceID")
+        .get("result")
         .and_then(|v| v.as_str())
         .unwrap_or("")
         .to_string())
