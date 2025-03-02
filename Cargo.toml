@@ -8,6 +8,9 @@ version = "0.1.0"
 edition = "2021"
 authors = ["David Horner"]
 
+[features]
+default = ["lua"]
+lua = ["mlua"]
 
 
 [dependencies]
@@ -24,6 +27,7 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 #webrtc = "0.12.0"
 webrtc = { git = "https://github.com/davehorner/webrtc.git", branch = "jetkvm_16_bit_patch", version = "0.12.0" }
+mlua = { version = "0.10.1", features = ["lua54", "vendored", "async", "send", "serialize"], optional = true }
 
 [dev-dependencies]
 regex = "1.11.1"

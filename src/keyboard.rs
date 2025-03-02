@@ -3,6 +3,8 @@ use anyhow::Result as AnyResult;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Sends a keyboard report with the given modifier and keys.
 pub async fn rpc_keyboard_report(
@@ -233,6 +235,91 @@ pub async fn send_windows_key(client: &crate::jetkvm_rpc_client::JetKvmRpcClient
             }),
         )
         .await?;
+
+    Ok(())
+}
+
+/// Registers keyboard functions to the provided Lua context.
+#[cfg(feature = "lua")]
+use mlua::prelude::*;
+#[cfg(feature = "lua")]
+pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult<()> {
+    let send_return_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_return(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_return", send_return_fn)?;
+
+    let send_ctrl_a_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_ctrl_a(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_ctrl_a", send_ctrl_a_fn)?;
+
+    let send_ctrl_v_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_ctrl_v(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_ctrl_v", send_ctrl_v_fn)?;
+
+    let send_ctrl_x_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_ctrl_x(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_ctrl_x", send_ctrl_x_fn)?;
+
+    let send_ctrl_c_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_ctrl_c(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_ctrl_c", send_ctrl_c_fn)?;
+
+    let send_windows_key_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, ()| {
+            let client = client.clone();
+            async move {
+                send_windows_key(&*client.lock().await).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_windows_key", send_windows_key_fn)?;
+
+    let send_text_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, text: String| {
+            let client = client.clone();
+            async move {
+                rpc_sendtext(&*client.lock().await, &text).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("send_text", send_text_fn)?;
 
     Ok(())
 }

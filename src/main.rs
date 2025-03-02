@@ -2,10 +2,8 @@ use anyhow::Result as AnyResult;
 use jetkvm_control::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_control::jetkvm_config::JetKvmConfig;
 use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
-use jetkvm_control::mouse::rpc_abs_mouse_report;
-use jetkvm_control::mouse::*;
 use jetkvm_control::system::rpc_get_edid;
-use tokio::time::{sleep, Duration};
+
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -31,6 +29,36 @@ async fn main() -> AnyResult<()> {
 
     let edid = rpc_get_edid(&client).await;
     info!("EDID: {:?}", edid);
+
+    #[cfg(feature = "lua")]
+    {
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+        use jetkvm_control::lua_engine::LuaEngine;
+        let client_arc = Arc::new(Mutex::new(client));
+    
+        // Create and configure the Lua engine.
+        let lua_engine = LuaEngine::new(client_arc);
+        lua_engine.register_builtin_functions()?;
+    
+        // Optionally, execute a Lua script.
+        let script = r#"
+            print("Executing Lua script...")
+            send_windows_key()
+            delay(250)
+            send_text("notepad")
+            send_return()
+            delay(250)
+            send_text("Hello World!")
+            send_ctrl_a()
+            send_ctrl_c()
+            right_click(100, 200)
+        "#;
+    
+        lua_engine.exec_script(script).await?;
+        info!("Lua script executed successfully."); 
+    }
+
 
     Ok(())
 }

@@ -2,6 +2,8 @@ use crate::jetkvm_rpc_client::JetKvmRpcClient;
 use anyhow::Result as AnyResult;
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// Sends an absolute mouse report with x, y coordinates and button state.
 pub async fn rpc_abs_mouse_report(
@@ -200,5 +202,68 @@ pub async fn rpc_left_click_and_drag_to_center(
             }),
         )
         .await?;
+    Ok(())
+}
+
+/// Registers mouse functions to the provided Lua context.
+#[cfg(feature = "lua")]
+use mlua::prelude::*;
+#[cfg(feature = "lua")]
+pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult<()> {
+    let left_click_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, (x, y): (i64, i64)| {
+            let client = client.clone();
+            async move {
+                rpc_left_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("left_click", left_click_fn)?;
+
+    let right_click_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, (x, y): (i64, i64)| {
+            let client = client.clone();
+            async move {
+                rpc_right_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("right_click", right_click_fn)?;
+
+    let middle_click_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, (x, y): (i64, i64)| {
+            let client = client.clone();
+            async move {
+                rpc_middle_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("middle_click", middle_click_fn)?;
+
+    let move_mouse_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, (x, y): (i64, i64)| {
+            let client = client.clone();
+            async move {
+                rpc_move_mouse(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("move_mouse", move_mouse_fn)?;
+
+    let double_click_fn = {
+        let client = client.clone();
+        lua.create_async_function(move |_, (x, y): (i64, i64)| {
+            let client = client.clone();
+            async move {
+                rpc_double_click(&*client.lock().await, x, y).await.map_err(mlua::Error::external)
+            }
+        })?
+    };
+    lua.globals().set("double_click", double_click_fn)?;
+
     Ok(())
 }

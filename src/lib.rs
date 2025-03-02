@@ -6,5 +6,6 @@ pub mod keyboard;
 pub mod mouse;
 pub mod rpc_client;
 pub mod system;
+pub mod lua_engine;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;
