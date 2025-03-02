@@ -37,6 +37,12 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
       port = "80"
       api = "/webrtc/session"
       ```
+
+    You can also override these values via the command-line. For example:
+    ```
+    cargo run -- --host 192.168.1.100 --port 8080
+    ```
+
 3. **Running the Project**
     After setting up your configuration, you can build and run the project with Cargo:
      ```bash

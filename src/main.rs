@@ -1,9 +1,7 @@
 use anyhow::Result as AnyResult;
 use clap::{CommandFactory, Parser};
-use jetkvm_control::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_control::jetkvm_config::JetKvmConfig;
 use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
-use jetkvm_control::system::rpc_get_edid;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
 use tracing_subscriber;
@@ -26,10 +24,16 @@ struct CliConfig {
     /// The password for authentication.
     #[arg(short = 'P', long)]
     password: Option<String>,
+
+    // When the "lua" feature is enabled, the first positional argument is the Lua script path.
+    #[cfg(feature = "lua")]
+    /// Path to the Lua script to execute.
+    #[arg(required = true, index = 1)]
+    lua_script: String,
 }
 
 /// Loads configuration from file (or uses the default) and then applies CLI overrides.
-fn load_and_override_config(cli_config: CliConfig) -> JetKvmConfig {
+fn load_and_override_config(cli_config: &CliConfig) -> JetKvmConfig {
     let mut config = JetKvmConfig::load().unwrap_or_else(|err| {
         warn!(
             "Failed to load config.toml ({}). Using default configuration.",
@@ -38,17 +42,17 @@ fn load_and_override_config(cli_config: CliConfig) -> JetKvmConfig {
         JetKvmConfig::default()
     });
 
-    if let Some(host) = cli_config.host {
-        config.host = host;
+    if let Some(host) = &cli_config.host {
+        config.host = host.clone();
     }
-    if let Some(port) = cli_config.port {
-        config.port = port;
+    if let Some(port) = &cli_config.port {
+        config.port = port.clone();
     }
-    if let Some(api) = cli_config.api {
-        config.api = api;
+    if let Some(api) = &cli_config.api {
+        config.api = api.clone();
     }
-    if let Some(password) = cli_config.password {
-        config.password = password;
+    if let Some(password) = &cli_config.password {
+        config.password = password.clone();
     }
     config
 }
@@ -65,7 +69,7 @@ async fn main() -> AnyResult<()> {
     info!("CLI config provided: {:?}", cli_config);
 
     // Load configuration from file (or default) and override with CLI options.
-    let config = load_and_override_config(cli_config);
+    let config = load_and_override_config(&cli_config);
 
     // Validate that the critical field 'host' is set.
     if config.host.trim().is_empty() {
@@ -76,49 +80,48 @@ async fn main() -> AnyResult<()> {
         std::process::exit(1);
     }
 
-    // Create and use the client.
+    // Create and connect the client.
     let mut client = JetKvmRpcClient::new(config);
-
     if let Err(err) = client.connect().await {
         error!("Failed to connect to RPC server: {:?}", err);
         std::process::exit(1);
     }
     client.wait_for_channel_open().await?;
-    let ping = rpc_ping(&client).await;
-    info!("Ping: {:?}", ping);
-    let device_id = rpc_get_device_id(&client).await;
-    info!("Device ID: {:?}", device_id);
-    let edid = rpc_get_edid(&client).await;
-    info!("EDID: {:?}", edid);
 
+    // Lua mode: if the "lua" feature is enabled, read and execute the provided Lua script.
     #[cfg(feature = "lua")]
     {
         use jetkvm_control::lua_engine::LuaEngine;
         use std::sync::Arc;
         use tokio::sync::Mutex;
-        let client_arc = Arc::new(Mutex::new(client));
 
-        // Create and configure the Lua engine.
+        // Read the Lua script from the file path given as the first positional argument.
+        let script = tokio::fs::read_to_string(&cli_config.lua_script).await?;
+        info!("Executing Lua script from {}", &cli_config.lua_script);
+
+        // Wrap the client in an Arc/Mutex for the Lua engine.
+        let client_arc = Arc::new(Mutex::new(client));
         let lua_engine = LuaEngine::new(client_arc);
         lua_engine.register_builtin_functions()?;
 
-        // Optionally, execute a Lua script.
-        let script = r#"
-            print("Executing Lua script...")
-            send_windows_key()
-            delay(250)
-            send_text("notepad")
-            send_return()
-            delay(250)
-            send_text("Hello World!")
-            send_ctrl_a()
-            send_ctrl_c()
-            right_click(100, 200)
-        "#;
-
-        lua_engine.exec_script(script).await?;
+        lua_engine.exec_script(&script).await?;
         info!("Lua script executed successfully.");
+    }
+
+    // Normal mode: if the "lua" feature is not enabled, perform normal actions.
+    #[cfg(not(feature = "lua"))]
+    {
+        use jetkvm_control::device::{rpc_get_device_id, rpc_ping};
+        use jetkvm_control::system::rpc_get_edid;
+
+        let ping = rpc_ping(&client).await;
+        info!("Ping: {:?}", ping);
+        let device_id = rpc_get_device_id(&client).await;
+        info!("Device ID: {:?}", device_id);
+        let edid = rpc_get_edid(&client).await;
+        info!("EDID: {:?}", edid);
     }
 
     Ok(())
 }
+
