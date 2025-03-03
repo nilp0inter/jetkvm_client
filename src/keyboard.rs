@@ -20,19 +20,25 @@ pub async fn rpc_keyboard_report(
 }
 
 /// Convert an ASCII character into a (modifier, keycode) pair, following HID usage tables.
-/// Currently supports letters and digits only.
-/// - For lowercase letters, modifier = 0, keycode = 0x04 + (c - 'a').
-/// - For uppercase letters, modifier = 0x02 (shift), keycode = same as lowercase.
-/// - For digits: '1' to '9' map to 0x1E..0x26, '0' maps to 0x27.
+///
+/// For letters:
+/// - Lowercase: modifier = 0, keycode = 0x04 + (c - 'a').
+/// - Uppercase: modifier = 0x02 (shift), keycode = same as lowercase.
+///
+/// For digits:
+/// - '1' to '9': keycodes 0x1E to 0x26 respectively,
+/// - '0': keycode 0x27.
+///
+/// For space:
+/// - Keycode is 0x2C with no modifier.
+///
+/// For common punctuation and symbols, the mapping is defined in a static table.
+///
+/// Returns `None` if the character is not supported.
 fn char_to_hid(c: char) -> Option<(u8, u8)> {
     if c.is_ascii_alphabetic() {
-        let base = 0x04;
-        if c.is_ascii_lowercase() {
-            Some((0, (c as u8) - b'a' + base))
-        } else {
-            // Uppercase letters require SHIFT (modifier 0x02)
-            Some((0x02, (c.to_ascii_lowercase() as u8) - b'a' + base))
-        }
+        let shift = if c.is_ascii_uppercase() { 0x02 } else { 0 };
+        Some((shift, (c.to_ascii_lowercase() as u8) - b'a' + 0x04))
     } else if c.is_ascii_digit() {
         if c == '0' {
             Some((0, 0x27))
@@ -40,11 +46,45 @@ fn char_to_hid(c: char) -> Option<(u8, u8)> {
             Some((0, (c as u8) - b'1' + 0x1E))
         }
     } else if c == ' ' {
-        // HID usage for space is 0x2C, no modifier.
+        // HID usage for space.
         Some((0, 0x2C))
     } else {
-        // Extend with additional mappings as needed.
-        None
+        // Mapping for additional punctuation and symbols.
+        const MAP: &[(char, (u8, u8))] = &[
+            ('!', (0x02, 0x1E)), // Shift + '1'
+            ('@', (0x02, 0x1F)), // Shift + '2'
+            ('#', (0x02, 0x20)), // Shift + '3'
+            ('$', (0x02, 0x21)), // Shift + '4'
+            ('%', (0x02, 0x22)), // Shift + '5'
+            ('^', (0x02, 0x23)), // Shift + '6'
+            ('&', (0x02, 0x24)), // Shift + '7'
+            ('*', (0x02, 0x25)), // Shift + '8'
+            ('(', (0x02, 0x26)), // Shift + '9'
+            (')', (0x02, 0x27)), // Shift + '0'
+            ('-', (0, 0x2D)),
+            ('_', (0x02, 0x2D)),
+            ('=', (0, 0x2E)),
+            ('+', (0x02, 0x2E)),
+            ('[', (0, 0x2F)),
+            ('{', (0x02, 0x2F)),
+            (']', (0, 0x30)),
+            ('}', (0x02, 0x30)),
+            ('\\', (0, 0x31)),
+            ('|', (0x02, 0x31)),
+            (';', (0, 0x33)),
+            (':', (0x02, 0x33)),
+            ('\'', (0, 0x34)),
+            ('"', (0x02, 0x34)),
+            ('`', (0, 0x35)),
+            ('~', (0x02, 0x35)),
+            (',', (0, 0x36)),
+            ('<', (0x02, 0x36)),
+            ('.', (0, 0x37)),
+            ('>', (0x02, 0x37)),
+            ('/', (0, 0x38)),
+            ('?', (0x02, 0x38)),
+        ];
+        MAP.iter().find_map(|&(ch, pair)| if ch == c { Some(pair) } else { None })
     }
 }
 

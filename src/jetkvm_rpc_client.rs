@@ -110,16 +110,16 @@ impl JetKvmRpcClient {
 
         // 7. Send the offer to the server.
         let url = self.config.session_url();
-        debug!("Sending SDP Offer to {}", url);
+        //debug!("Sending SDP Offer to {}", url);
 
         let response = http_client.post(&url).json(&session_request).send().await?;
         let response_text = response.text().await?;
-        debug!("Received SDP Answer response: {}", response_text);
+        //debug!("Received SDP Answer response: {}", response_text);
 
         let session_response: WebRTCSessionResponse = serde_json::from_str(&response_text)?;
         let decoded_answer = general_purpose::STANDARD.decode(session_response.sd)?;
         let answer_value: Value = serde_json::from_slice(&decoded_answer)?;
-        debug!("Decoded SDP answer: {}", answer_value);
+        //debug!("Decoded SDP answer: {}", answer_value);
 
         let sdp_field = answer_value
             .get("sdp")

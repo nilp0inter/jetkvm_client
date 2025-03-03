@@ -6,7 +6,6 @@ use std::{
 use anyhow::{anyhow, Result as AnyResult};
 use serde_json::{json, Value};
 use tokio::sync::oneshot;
-use tracing::info;
 use tracing::{debug, error};
 use webrtc::data_channel::{
     data_channel_message::DataChannelMessage, data_channel_state::RTCDataChannelState,
@@ -55,11 +54,11 @@ impl RpcClient {
                                 if let Some(tx) = map.remove(&id) {
                                     let _ = tx.send(Ok(v));
                                 } else {
-                                    debug!("⚠️ Response ID not found in pending map: {}", id);
+                                    debug!("Response ID not found in pending map: {}", id);
                                 }
                             }
                         } else {
-                            debug!("⚠️ No `id` field found in JSON response.");
+                            debug!("msg: {}",text);
                         }
                     }
                     Err(e) => {
@@ -94,18 +93,18 @@ impl RpcClient {
         match self.dc.send_text(&payload_str).await {
             Ok(_) => {}
             Err(e) => {
-                error!("❌ Failed to send RPC: {:?}", e);
+                error!("Failed to send RPC: {:?}", e);
                 return Err(anyhow!("Failed to send RPC"));
             }
         }
 
         match rx.await {
             Ok(response) => {
-                debug!("📩 Received RPC Response: {:?}", response);
+                //debug!("Received RPC Response: {:?}", response);
                 response
             }
             Err(_) => {
-                error!("❌ Response channel closed");
+                error!("Response channel closed");
                 Err(anyhow!("Response channel closed"))
             }
         }

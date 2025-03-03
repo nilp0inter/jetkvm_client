@@ -2,9 +2,9 @@ use anyhow::Result as AnyResult;
 use clap::{CommandFactory, Parser};
 use jetkvm_control::jetkvm_config::JetKvmConfig;
 use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
-use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
-use tracing_subscriber;
+use tracing_subscriber::{fmt, EnvFilter, registry};
+use tracing_subscriber::prelude::*;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -24,6 +24,10 @@ struct CliConfig {
     /// The password for authentication.
     #[arg(short = 'P', long)]
     password: Option<String>,
+
+    /// Enable verbose logging (include logs from webrtc_sctp).
+    #[arg(short = 'v', long)]
+    verbose: bool,
 
     // When the "lua" feature is enabled, the first positional argument is the Lua script path.
     #[cfg(feature = "lua")]
@@ -59,14 +63,35 @@ fn load_and_override_config(cli_config: &CliConfig) -> JetKvmConfig {
 
 #[tokio::main]
 async fn main() -> AnyResult<()> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
-        .init();
-    info!("Starting jetkvm_control demo...");
-
     // Parse CLI arguments.
     let cli_config = CliConfig::parse();
     info!("CLI config provided: {:?}", cli_config);
+
+    // Build a filter string: by default, disable webrtc_sctp logging,
+    // but if verbose is enabled, include all logs.
+    let filter_directive = if cli_config.verbose {
+        "debug"
+    } else {
+        "debug,\
+         webrtc_sctp=off,\
+         webrtc::peer_connection=off,\
+         webrtc_dtls=off,\
+         webrtc_mdns=off,\
+         hyper_util::client=off,\
+         webrtc_data::data_channel=off,\
+         webrtc_ice=off"
+    };
+
+    // Initialize tracing subscriber with the constructed filter.
+    // Create an EnvFilter using the directive.
+    let env_filter = EnvFilter::new(filter_directive);
+
+    // Build a subscriber with the filter layer and formatting layer.
+    registry()
+        .with(env_filter)
+        .with(fmt::layer())
+        .init();
+    info!("Starting jetkvm_control demo...");
 
     // Load configuration from file (or default) and override with CLI options.
     let config = load_and_override_config(&cli_config);

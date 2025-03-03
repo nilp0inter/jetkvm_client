@@ -46,62 +46,85 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
 3. **Running the Project**
     After setting up your configuration, you can build and run the project with Cargo:
      ```bash
-     cargo run
+     cargo run -- -H 192.168.1.100 lua-examples/windows-notepad-helloworld.lua
      ```
 
-    This will compile the project and start the demo application which:
+    This will compile the project and execute the window-notepad-helloworld.lua example.
   
-        - Connects to the JetKVM service,
-        - Opens a WebRTC DataChannel,
-        - Sends RPC calls to perform actions (e.g., keyboard events, mouse clicks).
+## About the cmdline client
 
-## What's the cmdline client look like
+The client (cargo run/jetkvm_control) is a simple ping if you don't have the `lua` feature enabled.
 
-Right now the client doesn't do anything put ping and display some additional debug.
+If you enable the lua feature; jetkvm_control will expect a lua file to execute.
 
 ```
 A control client for JetKVM over WebRTC.
 
-Usage: jetkvm_control [OPTIONS]
+Usage: jetkvm_control [OPTIONS] <LUA_SCRIPT>
+
+Arguments:
+  <LUA_SCRIPT>  Path to the Lua script to execute
 
 Options:
   -H, --host <HOST>          The host address to connect to
   -p, --port <PORT>          The port number to use
   -a, --api <API>            The API endpoint
   -P, --password <PASSWORD>  The password for authentication
+  -v, --verbose              Enable verbose logging (include logs from webrtc_sctp)
   -h, --help                 Print help
   -V, --version              Print version
 ```
 
 ## What's the code look like
 
-   ```rust
-    let config = JetKvmConfig::load()?;
-    let mut client = JetKvmRpcClient::new(config);
+The api is subject to change.
 
-    if let Err(err) = client.connect().await {
-        error!("Failed to connect to RPC server: {:?}", err);
-        std::process::exit(1);
-    }
-    // open notepad and say Hello World, copy and paste.
-    send_windows_key(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    rpc_sendtext(&client, "notepad").await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_return(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    rpc_sendtext(&client, "Hello World").await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_a(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_x(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_v(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_return(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_v(&client).await.ok();
-   ```
+example code for rust:
+```rust
+let config = JetKvmConfig::load()?;
+let mut client = JetKvmRpcClient::new(config);
+
+if let Err(err) = client.connect().await {
+    error!("Failed to connect to RPC server: {:?}", err);
+    std::process::exit(1);
+}
+// open notepad and say Hello World, copy and paste.
+send_windows_key(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+rpc_sendtext(&client, "notepad").await.ok();
+sleep(Duration::from_millis(100)).await;
+send_return(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+rpc_sendtext(&client, "Hello World").await.ok();
+sleep(Duration::from_millis(100)).await;
+send_ctrl_a(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+send_ctrl_x(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+send_ctrl_v(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+send_return(&client).await.ok();
+sleep(Duration::from_millis(100)).await;
+send_ctrl_v(&client).await.ok();
+```
+
+example code in lua:
+```lua
+print("Executing Lua script...")
+send_windows_key()
+delay(550)
+send_text("notepad")
+send_return()
+delay(250)
+delay(250)
+send_text("Hello World!")
+send_ctrl_a()
+send_ctrl_c()
+delay(250)
+send_ctrl_v()
+delay(250)
+send_ctrl_v()
+```
 
 Check out the examples folder for additional detail.
 
@@ -135,9 +158,8 @@ JetKVM **relies heavily on WebRTC** for real-time communication, but we encounte
 - The Cargo.toml points to the patched https://github.com/davehorner/webrtc/tree/jetkvm_16_bit_patch
 
 ## Note
-  - Password-based authentication is functional.
+  - Password-less and Password-based local authentication have been tested functional.
   - Cloud integration and ICE/STUN support are not implemented yet.
-  - Password-less authentication has not been tested.
   - Contributions for these features are welcome!
 
 ## License

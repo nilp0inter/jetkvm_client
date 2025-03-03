@@ -1,6 +1,6 @@
 print("Executing Lua script...")
 send_windows_key()
-delay(250)
+delay(550)
 send_text("notepad")
 send_return()
 delay(250)
