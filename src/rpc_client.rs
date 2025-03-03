@@ -58,7 +58,7 @@ impl RpcClient {
                                 }
                             }
                         } else {
-                            debug!("msg: {}",text);
+                            debug!("msg: {}", text);
                         }
                     }
                     Err(e) => {

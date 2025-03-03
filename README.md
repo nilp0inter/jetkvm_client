@@ -18,17 +18,25 @@ Add this crate as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-jetkvm_control = "0.1.0"  # or use a git dependency / local path during development
+jetkvm_control = "0.1.3"  # or use a git dependency / local path during development
 ```
 
 ### Setup
 
-1. **Clone the Repository**
+1. **Install via cargo**
    ```
-   git clone https://github.com/davehorner/jetkvm_control.git
-   cd jetkvm_control
-    ```
-2. **Configure Your Settings**
+   cargo install jetkvm_control
+   ```
+
+   - or - 
+
+   **Clone the Repository**
+      ```
+      git clone https://github.com/davehorner/jetkvm_control.git
+      cd jetkvm_control
+      ```
+
+3. **Configure Your Settings**
 
     Before running the project, update your configuration settings. The project reads its configuration from either a config.toml file or environment variables. For example, create a config.toml with your settings:
       ```toml
@@ -43,7 +51,7 @@ jetkvm_control = "0.1.0"  # or use a git dependency / local path during developm
     cargo run -- --host 192.168.1.100 --port 8080
     ```
 
-3. **Running the Project**
+4. **Running the Project**
     After setting up your configuration, you can build and run the project with Cargo:
      ```bash
      cargo run -- -H 192.168.1.100 lua-examples/windows-notepad-helloworld.lua
@@ -147,16 +155,6 @@ The configuration file (`config.toml`) is loaded based on the following priority
 
 If no configuration file is found, the program exits with an error message.
 
-
-## WebRTC and SRTP Patching
-
-JetKVM **relies heavily on WebRTC** for real-time communication, but we encountered several issues that required **custom patches** to the WebRTC Rust implementation. Below is an overview of the changes:
-
-### 🔑 **SRTP Key Length Fix**
-- Initially, **SRTP key derivation** failed due to an incorrect **key length mismatch** (`expected 16, got 32`).
-- We modified WebRTC’s **SRTP protection profile** to enforce **AES128CM_HMAC_SHA1_80**, ensuring **16-byte key compatibility**.
-- The Cargo.toml points to the patched https://github.com/davehorner/webrtc/tree/jetkvm_16_bit_patch
-
 ## Note
   - Password-less and Password-based local authentication have been tested functional.
   - Cloud integration and ICE/STUN support are not implemented yet.
@@ -167,3 +165,4 @@ This project is licensed under the MIT License. See LICENSE for details.
 
 ## Contributing
 Contributions are welcome! Please submit a pull request or open an issue to discuss changes.
+

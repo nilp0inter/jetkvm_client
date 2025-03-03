@@ -12,6 +12,7 @@ use tokio::time::Duration;
 use tracing::debug;
 use webrtc::{
     api::{media_engine::MediaEngine, APIBuilder},
+    dtls::extension::extension_use_srtp::SrtpProtectionProfile,
     peer_connection::{
         configuration::RTCConfiguration,
         sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
@@ -62,8 +63,16 @@ impl JetKvmRpcClient {
         self.http_client = Some(http_client.clone());
 
         // 2. Initialize WebRTC.
+        let mut setting_engine = webrtc::api::setting_engine::SettingEngine::default();
+        setting_engine.set_srtp_protection_profiles(vec![
+            SrtpProtectionProfile::Srtp_Aead_Aes_128_Gcm,
+            SrtpProtectionProfile::Srtp_Aes128_Cm_Hmac_Sha1_80,
+        ]);
         let media_engine = MediaEngine::default();
-        let api = APIBuilder::new().with_media_engine(media_engine).build();
+        let api = APIBuilder::new()
+            .with_setting_engine(setting_engine)
+            .with_media_engine(media_engine)
+            .build();
         let config_rtc = RTCConfiguration::default();
         let peer_connection = Arc::new(api.new_peer_connection(config_rtc).await?);
         debug!("PeerConnection created.");

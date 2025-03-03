@@ -3,8 +3,8 @@ use clap::{CommandFactory, Parser};
 use jetkvm_control::jetkvm_config::JetKvmConfig;
 use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
 use tracing::{error, info, warn};
-use tracing_subscriber::{fmt, EnvFilter, registry};
 use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, registry, EnvFilter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -87,10 +87,7 @@ async fn main() -> AnyResult<()> {
     let env_filter = EnvFilter::new(filter_directive);
 
     // Build a subscriber with the filter layer and formatting layer.
-    registry()
-        .with(env_filter)
-        .with(fmt::layer())
-        .init();
+    registry().with(env_filter).with(fmt::layer()).init();
     info!("Starting jetkvm_control demo...");
 
     // Load configuration from file (or default) and override with CLI options.
@@ -149,4 +146,3 @@ async fn main() -> AnyResult<()> {
 
     Ok(())
 }
-

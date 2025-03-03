@@ -84,7 +84,8 @@ fn char_to_hid(c: char) -> Option<(u8, u8)> {
             ('/', (0, 0x38)),
             ('?', (0x02, 0x38)),
         ];
-        MAP.iter().find_map(|&(ch, pair)| if ch == c { Some(pair) } else { None })
+        MAP.iter()
+            .find_map(|&(ch, pair)| if ch == c { Some(pair) } else { None })
     }
 }
 
