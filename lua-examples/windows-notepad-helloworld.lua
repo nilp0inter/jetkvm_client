@@ -12,4 +12,8 @@ delay(250)
 send_ctrl_v()
 delay(250)
 send_ctrl_v()
-
+send_key_combinations({
+    { modifier = 0x04, keys = {0x3D}, hold = 100, wait = 1000 }, -- Alt+F4
+    { modifier = 0, keys = {0x4F}, wait = 250 }, -- Right arrow
+    { modifier = 0, keys = {0x28} },  -- Return (Enter)
+})
