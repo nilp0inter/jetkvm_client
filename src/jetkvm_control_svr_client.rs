@@ -127,6 +127,7 @@ impl JetKVMControlSvrClient {
 
     /// Attempt to connect to the server.
     /// In test mode, we simply try to open a TCP connection.
+    #[allow(dead_code)]
     async fn connect_plain(
         &mut self,
         host: String,

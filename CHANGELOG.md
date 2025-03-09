@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/davehorner/jetkvm_control/compare/jetkvm_control-v0.1.4...jetkvm_control-v0.2.0) - 2025-03-09
+
+### Added
+
+- [**breaking**] interactive configuration features (-c) to edit jetkvm_control.toml files.
+
 ## [0.1.4](https://github.com/davehorner/jetkvm_control/compare/jetkvm_control-v0.1.3...jetkvm_control-v0.1.4) - 2025-03-09
 
 ### Added

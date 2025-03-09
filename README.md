@@ -29,15 +29,15 @@
 
 2. **Configure Your Settings**
 
-    The project reads its configuration from either a config.toml file:
-      ```toml
-      host = "host/ip"
-      password = "your_password_here"
-      port = "80"
-      api = "/webrtc/session"
-      ```
+    The project reads its configuration from either a jetkvm_control.toml file.
+    Run the following command to edit/create jetkvm_control.toml files.
+     ```bash
+     cargo run -- -c
+        -or-   
+     jetkvm_control -c
+     ```
 
-    You can also override these values via the command-line but defining it in the config.toml makes the example scripts work.
+    You can override values via the command-line.
 
 3. **Running the Project**
     After setting up your configuration, you can build and run the project with Cargo:
@@ -128,29 +128,6 @@ send_key_combinations({
 ```
 
 Check out the examples folder for additional detail.
-
----
-
-## **Configuration Loading Precedence**
-The configuration file (`config.toml`) is loaded based on the following priority order:
-
-### ** Priority Order**
-| Priority | macOS/Linux                  | Windows                                  |
-|----------|------------------------------|------------------------------------------|
-| 1️⃣**(Highest)** | `config.toml` (Current Directory) | `config.toml` (Current Directory) |
-| 2️⃣| `${CARGO_MANIFEST_DIR}/config.toml` | `${CARGO_MANIFEST_DIR}/config.toml` |
-| 3️⃣**(System-Wide)** | `/etc/jetkvm_control/config.toml` | `%APPDATA%\jetkvm_control\config.toml` |
-
-### **📍 How Configuration is Resolved**
-- **Current Directory (`config.toml`)** – Preferred for local development.
-- **Cargo Project Root (`CARGO_MANIFEST_DIR/config.toml`)** – Used when running inside a Rust project.
-- **System-Wide Location (`/etc/jetkvm_control/config.toml` or `%APPDATA%\jetkvm_control\config.toml`)** – Used when no local config is found.
-
-
-## Note
-  - Password-less and Password-based local authentication have been tested functional.
-  - Cloud integration and ICE/STUN support are not implemented yet.
-  - Contributions for these features are welcome!
 
 ## License
 This project is licensed under the MIT License. See LICENSE for details.

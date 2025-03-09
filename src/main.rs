@@ -32,39 +32,44 @@ struct CliConfig {
     // When the "lua" feature is enabled, the first positional argument is the Lua script path.
     #[cfg(feature = "lua")]
     /// Path to the Lua script to execute.
-    #[arg(required = true, index = 1)]
+    #[arg(required = false, index = 1, default_value = "", num_args = 0..=1)]
     lua_script: String,
 
-    #[arg(long, default_value = "cert.pem")]
+    #[arg(short = 'C', long, default_value = "cert.pem")]
     ca_cert_path: Option<String>,
+
+    /// Initialize or edit the jetkvm_control.toml interactively.
+    #[arg(short = 'c', long = "config_init")]
+    config_init: bool,
+    
 }
 
 /// Loads configuration from file (or uses the default) and then applies CLI overrides.
 fn load_and_override_config(cli_config: &CliConfig) -> JetKvmConfig {
     let mut config = JetKvmConfig::load().unwrap_or_else(|err| {
         warn!(
-            "Failed to load config.toml ({}). Using default configuration.",
+            "Failed to load jetkvm_control.toml ({}). Using default configuration.",
             err
         );
-        JetKvmConfig::default()
+        (JetKvmConfig::default(),"".to_string(),true)
     });
 
     if let Some(host) = &cli_config.host {
-        config.host = host.clone();
+        config.0.host = host.clone();
     }
     if let Some(port) = &cli_config.port {
-        config.port = port.clone();
+        config.0.port = port.clone();
     }
     if let Some(api) = &cli_config.api {
-        config.api = api.clone();
+        config.0.api = api.clone();
     }
     if let Some(password) = &cli_config.password {
-        config.password = password.clone();
+        config.0.password = password.clone();
     }
     if let Some(ca_cert_path) = &cli_config.ca_cert_path {
-        config.ca_cert_path = ca_cert_path.clone();
+        config.0.ca_cert_path = ca_cert_path.clone();
     }
-    config
+    config.0
 }
 
 #[tokio::main]
@@ -77,6 +82,20 @@ async fn main() -> AnyResult<()> {
     // Parse CLI arguments.
     let cli_config = CliConfig::parse();
     info!("CLI config provided: {:?}", cli_config);
+    if cli_config.config_init {
+        jetkvm_control::jetkvm_config::interactive_config_location().await?;
+        return Ok(());
+    }
+    #[cfg(feature = "lua")]
+    {
+        if cli_config.lua_script.is_empty() {
+            eprintln!("Error: You must provide a Lua script when using the lua feature.");
+            // Print help and exit.
+            CliConfig::command().print_help().expect("failed to print help");
+            println!(); // newline after help
+            std::process::exit(1);
+        }
+    }
 
     // Build a filter string: by default, disable webrtc_sctp logging,
     // but if verbose is enabled, include all logs.
@@ -106,7 +125,7 @@ async fn main() -> AnyResult<()> {
 
     // Validate that the critical field 'host' is set.
     if config.host.trim().is_empty() {
-        eprintln!("Error: No host specified. Please set 'host' in config.toml or provide it via --host / -H.");
+        eprintln!("Error: No host specified. Please set 'host' in jetkvm_control.toml or provide it via --host / -H.");
         CliConfig::command()
             .print_help()
             .expect("Failed to print help");
@@ -128,9 +147,29 @@ async fn main() -> AnyResult<()> {
         use std::sync::Arc;
         use tokio::sync::Mutex;
 
-        // Read the Lua script from the file path given as the first positional argument.
-        let script = tokio::fs::read_to_string(&cli_config.lua_script).await?;
-        info!("Executing Lua script from {}", &cli_config.lua_script);
+
+// Resolve lua_script to a full absolute path
+let lua_script_path = tokio::fs::canonicalize(&cli_config.lua_script).await.map_err(|e| {
+    anyhow::anyhow!(
+        "Error resolving Lua script path '{}'.\nArguments: {:?}\nCurrent directory: '{}'\nError: {}",
+        &cli_config.lua_script,
+        std::env::args().collect::<Vec<_>>(),
+        std::env::current_dir().unwrap().display(),
+        e
+    )
+})?;
+
+let script = tokio::fs::read_to_string(&lua_script_path).await.map_err(|e| {
+    anyhow::anyhow!(
+        "Error reading Lua script from '{}'. Arguments passed: {:?}. Error details: {}",
+        cli_config.lua_script,
+        std::env::args().collect::<Vec<_>>(),
+        e
+    )
+})?;
+
+println!("Current working directory: {}", std::env::current_dir()?.display());
+info!("Executing Lua script from {}", &cli_config.lua_script);
 
         // Wrap the client in an Arc/Mutex for the Lua engine.
         let client_arc = Arc::new(Mutex::new(client));
