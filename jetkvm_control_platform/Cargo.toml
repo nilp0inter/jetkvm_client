@@ -1,6 +1,5 @@
 [package]
 name = "jetkvm_control_platform"
-version = "0.1.0"
 edition = "2021"
 
 [dependencies]
