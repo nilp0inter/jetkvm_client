@@ -6,7 +6,7 @@ use base64::{engine::general_purpose, Engine as _};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tracing::debug;
@@ -18,9 +18,6 @@ use webrtc::{
         sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
     },
 };
-
-/// A global atomic for unique JSON-RPC request IDs.
-static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 #[derive(Serialize, Deserialize)]
 struct WebRTCSessionRequest {
@@ -188,5 +185,55 @@ impl JetKvmRpcClient {
             self.connect().await?;
         }
         Ok(())
+    }
+    /// Asynchronous logout function for normal use.
+    pub async fn logout(&self) -> AnyResult<()> {
+        if let Some(client) = &self.http_client {
+            let url = format!("http://{}/auth/logout", self.config.host);
+            let resp = client.post(&url).send().await;
+
+            match resp {
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = resp
+                        .text()
+                        .await
+                        .unwrap_or_else(|_| "Failed to read body".to_string());
+                    tracing::info!("Logout Response [{}]: {}", status, body);
+                    Ok(())
+                }
+                Err(e) => {
+                    tracing::error!("Logout request failed: {}", e);
+                    Err(anyhow::anyhow!("Logout request failed: {}", e))
+                }
+            }
+        } else {
+            tracing::warn!("No HTTP client available, skipping logout.");
+            Ok(())
+        }
+    }
+
+    /// Gracefully disconnects by logging out and closing the RPC connection.
+    pub async fn shutdown(&mut self) {
+        if self.config.no_auto_logout {
+            tracing::info!("Auto-logout is disabled in config, skipping logout.");
+        } else {
+            if let Err(e) = self.logout().await {
+                tracing::warn!("Failed to logout on shutdown: {}", e);
+            }
+        }
+
+        if let Some(rpc) = self.rpc_client.take() {
+            tracing::info!("Closing WebRTC RPC connection...");
+            let _ = rpc.dc.close().await;
+        }
+
+        tracing::info!("JetKvmRpcClient shutdown completed.");
+    }
+}
+
+impl Drop for JetKvmRpcClient {
+    fn drop(&mut self) {
+        tracing::info!("JetKvmRpcClient dropped.");
     }
 }

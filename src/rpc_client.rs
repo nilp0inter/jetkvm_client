@@ -43,26 +43,48 @@ impl RpcClient {
         self.dc.on_message(Box::new(move |msg: DataChannelMessage| {
             let pending_clone = pending.clone(); // Clone it before moving it inside async
 
-            Box::pin(async move {
-                let text = String::from_utf8(msg.data.to_vec()).unwrap_or_default();
+            Box::pin({
+                let value = notification_callback.clone();
+                async move {
+                    let text = String::from_utf8(msg.data.to_vec()).unwrap_or_default();
 
-                match serde_json::from_str::<Value>(&text) {
-                    Ok(v) => {
-                        if let Some(id_val) = v.get("id") {
-                            if let Some(id) = id_val.as_u64() {
-                                let mut map = pending_clone.lock().unwrap();
-                                if let Some(tx) = map.remove(&id) {
-                                    let _ = tx.send(Ok(v));
+                    match serde_json::from_str::<Value>(&text) {
+                        Ok(v) => {
+                            if let Some(id_val) = v.get("id") {
+                                if let Some(id) = id_val.as_u64() {
+                                    let mut map = pending_clone.lock().unwrap();
+                                    if let Some(tx) = map.remove(&id) {
+                                        let _ = tx.send(Ok(v));
+                                    } else {
+                                        debug!("Response ID not found in pending map: {}", id);
+                                    }
+                                }
+                            } else {
+                                debug!("msg: {}", text);
+                                // This branch handles notifications (no "id" field).
+                                if let Some(callback) = value.as_ref() {
+                                    if let Some(method) = v.get("method").and_then(|m| m.as_str()) {
+                                        // Extract "params" if available, defaulting to Null.
+                                        let params =
+                                            v.get("params").cloned().unwrap_or(Value::Null);
+                                        callback(method, &params);
+                                    } else {
+                                        debug!(
+                                            "Notification received but missing 'method' field: {}",
+                                            text
+                                        );
+                                    }
                                 } else {
-                                    debug!("Response ID not found in pending map: {}", id);
+                                    debug!(
+                                        "Notification received (no callback installed): {}",
+                                        text
+                                    );
                                 }
                             }
-                        } else {
-                            debug!("msg: {}", text);
                         }
-                    }
-                    Err(e) => {
-                        error!("❌ Invalid JSON Received: {}: {:?}", text, e);
+                        Err(e) => {
+                            error!("❌ Invalid JSON Received: {}: {:?}", text, e);
+                        }
                     }
                 }
             })

@@ -8,6 +8,10 @@ use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> AnyResult<()> {
+    // Install the default crypto provider for rustls
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .ok();
     tracing_subscriber::fmt()
         .with_max_level(tracing::Level::DEBUG) // Set debug level
         .init();
@@ -26,6 +30,7 @@ async fn main() -> AnyResult<()> {
     sleep(Duration::from_millis(250)).await;
     send_return(&client).await.ok();
     sleep(Duration::from_millis(250)).await;
+    info!("sending helloworld");
     rpc_sendtext(&client, "Hello World").await.ok();
     sleep(Duration::from_millis(100)).await;
     send_ctrl_a(&client).await.ok();
