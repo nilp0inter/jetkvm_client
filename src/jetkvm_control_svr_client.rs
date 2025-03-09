@@ -29,6 +29,9 @@ struct Args {
     password: String,
     #[arg(long, default_value = "cert.pem")]
     ca_cert_path: String,
+    /// Run in test mode: attempt to connect and authenticate then exit with 0 if successful, 1 otherwise.
+    #[arg(short = 't', long, default_value_t = false)]
+    test: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -119,6 +122,22 @@ impl JetKVMControlSvrClient {
             ca_cert_path: "cert.pem".to_string(),
             challenge: None,
             stream: None,
+        }
+    }
+
+    /// Attempt to connect to the server.
+    /// In test mode, we simply try to open a TCP connection.
+    async fn connect_plain(
+        &mut self,
+        host: String,
+        port: u16,
+    ) -> Result<(bool, String), Box<dyn std::error::Error>> {
+        self.host = host;
+        self.port = port;
+        let addr = format!("{}:{}", self.host, self.port);
+        match tokio::net::TcpStream::connect(&addr).await {
+            Ok(_) => Ok((true, format!("Connected to {}:{}", self.host, self.port))),
+            Err(e) => Ok((false, format!("Failed to connect: {}", e))),
         }
     }
 
@@ -517,6 +536,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .ok();
+    let args = Args::parse();
+
+    if args.test {
+        println!(
+            "Test mode: attempting to connect to {}:{}",
+            args.host, args.port
+        );
+        let mut client = JetKVMControlSvrClient::new();
+        let (success, message) = client.connect_plain(args.host, args.port).await?;
+        println!("Connect result: {}: {}", success, message);
+        if success {
+            std::process::exit(0);
+        } else {
+            std::process::exit(1);
+        }
+    } else {
+        // Normal (non-test) mode implementation goes here.
+        // For example, you might launch an interactive session or run a specific Lua script.
+        // If not implemented, we exit with an error.
+        eprintln!("Normal mode not implemented in this example.");
+        std::process::exit(1);
+    }
 
     // let args = Args::parse();
 

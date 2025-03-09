@@ -1,27 +1,18 @@
 # jetkvm_control
 
-**jetkvm_control** is a Rust library and client for interacting with JetKVM devices using WebRTC and JSON‑RPC. It provides functionality to authenticate with a JetKVM server, set up a WebRTC PeerConnection with a DataChannel, and send various input events (keyboard and mouse) as well as receive notifications (such as screen resolution updates) from the device.
+**jetkvm_control** is a Rust client/server/library for interacting with JetKVM devices using WebRTC and JSON‑RPC. It provides functionality to authenticate with a JetKVM device, set up a WebRTC PeerConnection with a DataChannel, and send various input events (keyboard and mouse) as well as receive notifications (such as screen resolution updates) from the device.
+
+
+> **Note:** Starting with version **0.1.4 (2025-03-09)**, a new secure RPC server (**jetkvm_control_svr**) has been introduced. This server supports TLS encryption and HMAC authentication, and includes features such as active_window and active_process interrogation.  The server is cross-platform.  The `jetkvm_control_svr` may be used without a JetKVM device.  It comes with a rust client and Lua bindings.
+
 
 ## Features
 
-- **HTTP Authentication:** Log in to a JetKVM server with cookie-based authentication.
-- **WebRTC Connection:** Establish a WebRTC PeerConnection and DataChannel.
-- **JSON‑RPC Messaging:** Send JSON‑RPC calls over the DataChannel for various commands.
 - **Keyboard Input:** Functions for sending keyboard events including text, control combinations (Ctrl-A, Ctrl-C, Ctrl-V, Ctrl-X, etc.), and special keys (Return, Windows key, etc.).
 - **Mouse Control:** Functions for absolute mouse movement, clicks (left, right, middle), double-click, and click-and-drag actions.
-- **Notification Handling:** Receive notifications (e.g. videoInputState) and update internal state (such as screen resolution).
-- **Configurable:** Easily configure connection parameters (IP, port, API endpoint, and password) using environment variables. For a simple parameter bag, use the tuple-struct `JetKvmParams`.
+- **jetkvm_control_svr:** to monitor processes and windows during script execution.
 
 ## Installation
-
-Add this crate as a dependency in your `Cargo.toml`:
-
-```toml
-[dependencies]
-jetkvm_control = "0.1.3"  # or use a git dependency / local path during development
-```
-
-### Setup
 
 1. **Install via cargo**
    ```
@@ -36,9 +27,9 @@ jetkvm_control = "0.1.3"  # or use a git dependency / local path during developm
       cd jetkvm_control
       ```
 
-3. **Configure Your Settings**
+2. **Configure Your Settings**
 
-    Before running the project, update your configuration settings. The project reads its configuration from either a config.toml file or environment variables. For example, create a config.toml with your settings:
+    The project reads its configuration from either a config.toml file:
       ```toml
       host = "host/ip"
       password = "your_password_here"
@@ -46,12 +37,9 @@ jetkvm_control = "0.1.3"  # or use a git dependency / local path during developm
       api = "/webrtc/session"
       ```
 
-    You can also override these values via the command-line. For example:
-    ```
-    cargo run -- --host 192.168.1.100 --port 8080
-    ```
+    You can also override these values via the command-line but defining it in the config.toml makes the example scripts work.
 
-4. **Running the Project**
+3. **Running the Project**
     After setting up your configuration, you can build and run the project with Cargo:
      ```bash
      cargo run -- -H 192.168.1.100 lua-examples/windows-notepad-helloworld.lua
@@ -85,7 +73,7 @@ Options:
 
 ## What's the code look like
 
-The api is subject to change.
+The api is subject to change.   This project adheres to the "Semantic Versioning" standard.
 
 example code for rust:
 ```rust
@@ -146,19 +134,18 @@ Check out the examples folder for additional detail.
 ## **Configuration Loading Precedence**
 The configuration file (`config.toml`) is loaded based on the following priority order:
 
-### **📌 Priority Order**
+### ** Priority Order**
 | Priority | macOS/Linux                  | Windows                                  |
 |----------|------------------------------|------------------------------------------|
-| 1️⃣ **(Highest)** | `config.toml` (Current Directory) | `config.toml` (Current Directory) |
-| 2️⃣ | `${CARGO_MANIFEST_DIR}/config.toml` | `${CARGO_MANIFEST_DIR}/config.toml` |
-| 3️⃣ **(System-Wide)** | `/etc/jetkvm_control/config.toml` | `%APPDATA%\jetkvm_control\config.toml` |
+| 1️⃣**(Highest)** | `config.toml` (Current Directory) | `config.toml` (Current Directory) |
+| 2️⃣| `${CARGO_MANIFEST_DIR}/config.toml` | `${CARGO_MANIFEST_DIR}/config.toml` |
+| 3️⃣**(System-Wide)** | `/etc/jetkvm_control/config.toml` | `%APPDATA%\jetkvm_control\config.toml` |
 
 ### **📍 How Configuration is Resolved**
 - **Current Directory (`config.toml`)** – Preferred for local development.
 - **Cargo Project Root (`CARGO_MANIFEST_DIR/config.toml`)** – Used when running inside a Rust project.
 - **System-Wide Location (`/etc/jetkvm_control/config.toml` or `%APPDATA%\jetkvm_control\config.toml`)** – Used when no local config is found.
 
-If no configuration file is found, the program exits with an error message.
 
 ## Note
   - Password-less and Password-based local authentication have been tested functional.

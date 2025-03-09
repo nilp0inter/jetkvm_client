@@ -2,6 +2,8 @@
 
 This contains the JetKVM Control Secure RPC server, designed to handle requests for system information on a host machine. The server is built using Rust and provides TLS encryption and HMAC authentication to ensure secure and authenticated communication.
 
+JetKVM excels at remote mouse and keyboard control, while the jetkvm_control_svr complements this by enabling secure queries for the active process or window on the host machine. This added monitoring capability ensures that your scripts can verify the system’s current state before executing control actions, improving reliability and confidence in automation.
+
 ## Features
 
 - **Cross-Platform Compatibility**: Provides access to information about the active process and window on Windows and macOS.

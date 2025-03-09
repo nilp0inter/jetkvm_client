@@ -414,17 +414,26 @@ pub async fn send_key_combinations(
 
         if combo.instant_release.unwrap_or(false) {
             let keys_to_release: HashSet<u8> = combo.keys.iter().cloned().collect();
+            tracing::debug!(
+        "[DEBUG] Instant Release: Before releasing, active_keys: {:?}, active_modifiers: {:#04x}",
+        active_keys,
+        active_modifiers
+    );
             active_keys = active_keys.difference(&keys_to_release).cloned().collect();
 
-            if active_keys.is_empty() && !hold_modifiers.contains(&combo.modifier) {
+            // Check if any other combo still holds this modifier.
+            if combo.instant_release.unwrap_or(false)
+                || active_keys.is_empty() && !hold_modifiers.contains(&combo.modifier)
+            {
                 active_modifiers &= !combo.modifier;
             }
 
             tracing::debug!(
-                "[DEBUG] Instant Release activated. Releasing keys: {:?}, New Modifier: {:#04x}",
-                keys_to_release,
-                active_modifiers
-            );
+        "[DEBUG] Instant Release: After releasing, keys_to_release: {:?}, active_keys: {:?}, active_modifiers: {:#04x}",
+        keys_to_release,
+        active_keys,
+        active_modifiers
+    );
 
             client
                 .send_rpc(
@@ -438,6 +447,11 @@ pub async fn send_key_combinations(
         }
 
         if let Some(wait_duration) = combo.wait {
+            tracing::debug!(
+                "[DEBUG] End of combo: active_keys: {:?}, active_modifiers: {:#04x}",
+                active_keys,
+                active_modifiers
+            );
             tracing::debug!(
                 "[DEBUG] Waiting {}ms before processing next key combo...",
                 wait_duration
@@ -564,8 +578,8 @@ pub fn register_lua(lua: &Lua, client: Arc<Mutex<JetKvmRpcClient>>) -> LuaResult
             for pair in combos.sequence_values::<mlua::Table>() {
                 let combo_table = pair?;
 
-                let modifier: u8 = combo_table.get("modifier")?;
-                let keys: Vec<u8> = combo_table.get("keys")?;
+                let modifier: u8 = combo_table.get("modifier").unwrap_or(0); // ✅ Fixed type
+                let keys: Vec<u8> = combo_table.get("keys").unwrap_or_else(|_| Vec::new());
                 let hold_keys: bool = combo_table.get("hold_keys").unwrap_or(false); // ✅ Fixed type
                 let hold: Option<u64> = combo_table.get("hold").ok();
                 let wait: Option<u64> = combo_table.get("wait").ok();

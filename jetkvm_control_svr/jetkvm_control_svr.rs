@@ -74,7 +74,11 @@ struct RpcResponse {
 static CRYPTO_PROVIDER_LOCK: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
 fn setup_crypto_provider() {
-    CRYPTO_PROVIDER_LOCK.get_or_init(|| rustls::crypto::ring::default_provider().install_default().unwrap());
+    CRYPTO_PROVIDER_LOCK.get_or_init(|| {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .unwrap()
+    });
     // CRYPTO_PROVIDER_LOCK.get_or_init(|| rustls::crypto::aws_lc_rs::default_provider().install_default().ok());
 }
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4](https://github.com/davehorner/jetkvm_control/compare/jetkvm_control-v0.1.3...jetkvm_control-v0.1.4) - 2025-03-09
+
+### Added
+
+- initial release of jetkvm_control_svr with TLS and HMAC authentication
+- *(keyboard)* add send_key_combinations API and Lua binding
+- *(scripts)* add scripts folder with examples on automating the server and client.
+- *(examples)* add windows-alt-tab.lua, windows-notepad-helloworld.lua, windows-is_cmd_running.lua
+- *(doc)* windows-alt-tab.lua has been extensively documented, specifically for send_key_combinations
+
+### Fixed
+
+- *(jetkvm_control_svr)* enhance cryptographic provider setup
+
 ## [0.1.3](https://github.com/davehorner/jetkvm_control/compare/v0.1.2...v0.1.3) - 2025-03-03
 
 ### Other
