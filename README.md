@@ -129,6 +129,10 @@ send_key_combinations({
 
 Check out the examples folder for additional detail.
 
+## Contributions
+
+- 5/1/25 - [Senator3223/JetKey](https://github.com/Senator3223/JetKey/)  - use python to control your JetKVM using an api very similiar to jetkvm_control.  *does not include jetkvm_control_svr client*
+
 ## License
 This project is licensed under the MIT License. See LICENSE for details.
 
