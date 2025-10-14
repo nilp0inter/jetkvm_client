@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
-use jetkvm_control::jetkvm_config::JetKvmConfig;
-use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
-use jetkvm_control::keyboard::*;
+use jetkvm_client::jetkvm_config::JetKvmConfig;
+use jetkvm_client::jetkvm_rpc_client::JetKvmRpcClient;
+use jetkvm_client::keyboard::*;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
 use tracing_subscriber;
@@ -16,7 +16,7 @@ async fn main() -> AnyResult<()> {
         .with_max_level(tracing::Level::DEBUG) // Set debug level
         .init();
 
-    let config = JetKvmConfig::load()?;
+    let (config, _, _) = JetKvmConfig::load()?;
     let mut client = JetKvmRpcClient::new(config);
 
     if let Err(err) = client.connect().await {
