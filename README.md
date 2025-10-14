@@ -1,40 +1,45 @@
-# jetkvm_control
+# jetkvm_client
 
-**jetkvm_control** is a Rust client/server/library for interacting with JetKVM devices using WebRTC and JSON‑RPC. It provides functionality to authenticate with a JetKVM device, set up a WebRTC PeerConnection with a DataChannel, and send various input events (keyboard and mouse) as well as receive notifications (such as screen resolution updates) from the device.
+**jetkvm_client** is a Rust client library for interacting with JetKVM devices using WebRTC and JSON‑RPC. It provides functionality to authenticate with a JetKVM device, set up a WebRTC PeerConnection with a DataChannel, and send various input events (keyboard and mouse) as well as receive notifications (such as screen resolution updates) from the device.
 
+This is a fork of the original [jetkvm_control](https://github.com/davehorner/jetkvm_control) by David Horner. Thank you for your work!
 
-> **Note:** Starting with version **0.1.4 (2025-03-09)**, a new secure RPC server (**jetkvm_control_svr**) has been introduced. This server supports TLS encryption and HMAC authentication, and includes features such as active_window and active_process interrogation.  The server is cross-platform.  The `jetkvm_control_svr` may be used without a JetKVM device.  It comes with a rust client and Lua bindings.
+## New Goals
 
+The goal of this library is to be able to do programatically whatever a jetkvm user can do via the web interface.
+
+## TODO
+
+- [ ] Screen capture (screenshot and video)
 
 ## Features
 
 - **Keyboard Input:** Functions for sending keyboard events including text, control combinations (Ctrl-A, Ctrl-C, Ctrl-V, Ctrl-X, etc.), and special keys (Return, Windows key, etc.).
 - **Mouse Control:** Functions for absolute mouse movement, clicks (left, right, middle), double-click, and click-and-drag actions.
-- **jetkvm_control_svr:** to monitor processes and windows during script execution.
 
 ## Installation
 
 1. **Install via cargo**
    ```
-   cargo install jetkvm_control
+   cargo install jetkvm_client
    ```
 
    - or - 
 
    **Clone the Repository**
       ```
-      git clone https://github.com/davehorner/jetkvm_control.git
-      cd jetkvm_control
+      git clone https://github.com/nilp0inter/jetkvm_client.git
+      cd jetkvm_client
       ```
 
 2. **Configure Your Settings**
 
-    The project reads its configuration from either a jetkvm_control.toml file.
-    Run the following command to edit/create jetkvm_control.toml files.
+    The project reads its configuration from either a jetkvm_client.toml file.
+    Run the following command to edit/create jetkvm_client.toml files.
      ```bash
      cargo run -- -c
         -or-   
-     jetkvm_control -c
+     jetkvm_client -c
      ```
 
     You can override values via the command-line.
@@ -49,14 +54,14 @@
   
 ## About the cmdline client
 
-The client (cargo run/jetkvm_control) is a simple ping if you don't have the `lua` feature enabled.
+The client (cargo run/jetkvm_client) is a simple ping if you don't have the `lua` feature enabled.
 
-If you enable the lua feature; jetkvm_control will expect a lua file to execute.
+If you enable the lua feature; jetkvm_client will expect a lua file to execute.
 
 ```
-A control client for JetKVM over WebRTC.
+A client for JetKVM over WebRTC.
 
-Usage: jetkvm_control [OPTIONS] <LUA_SCRIPT>
+Usage: jetkvm_client [OPTIONS] <LUA_SCRIPT>
 
 Arguments:
   <LUA_SCRIPT>  Path to the Lua script to execute
@@ -131,11 +136,10 @@ Check out the examples folder for additional detail.
 
 ## Contributions
 
-- 5/1/25 - [Senator3223/JetKey](https://github.com/Senator3223/JetKey/)  - use python to control your JetKVM using an api very similiar to jetkvm_control.  *does not include jetkvm_control_svr client*
+- 5/1/25 - [Senator3223/JetKey](https://github.com/Senator3223/JetKey/)  - use python to control your JetKVM using an api very similiar to jetkvm_client.
 
 ## License
 This project is licensed under the MIT License. See LICENSE for details.
 
 ## Contributing
 Contributions are welcome! Please submit a pull request or open an issue to discuss changes.
-

@@ -1,7 +1,7 @@
 use anyhow::Result as AnyResult;
 use clap::{CommandFactory, Parser};
-use jetkvm_control::jetkvm_config::JetKvmConfig;
-use jetkvm_control::jetkvm_rpc_client::JetKvmRpcClient;
+use jetkvm_client::jetkvm_config::JetKvmConfig;
+use jetkvm_client::jetkvm_rpc_client::JetKvmRpcClient;
 use tracing::{error, info, warn};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, registry, EnvFilter};
@@ -38,7 +38,7 @@ struct CliConfig {
     #[arg(short = 'C', long, default_value = "cert.pem")]
     ca_cert_path: Option<String>,
 
-    /// Initialize or edit the jetkvm_control.toml interactively.
+    /// Initialize or edit the jetkvm_client.toml interactively.
     #[arg(short = 'c', long = "config_init")]
     config_init: bool,
     
@@ -46,30 +46,30 @@ struct CliConfig {
 
 /// Loads configuration from file (or uses the default) and then applies CLI overrides.
 fn load_and_override_config(cli_config: &CliConfig) -> JetKvmConfig {
-    let mut config = JetKvmConfig::load().unwrap_or_else(|err| {
+    let (mut config, _, _) = JetKvmConfig::load().unwrap_or_else(|err| {
         warn!(
-            "Failed to load jetkvm_control.toml ({}). Using default configuration.",
+            "Failed to load jetkvm_client.toml ({}). Using default configuration.",
             err
         );
         (JetKvmConfig::default(),"".to_string(),true)
     });
 
     if let Some(host) = &cli_config.host {
-        config.0.host = host.clone();
+        config.host = host.clone();
     }
     if let Some(port) = &cli_config.port {
-        config.0.port = port.clone();
+        config.port = port.clone();
     }
     if let Some(api) = &cli_config.api {
-        config.0.api = api.clone();
+        config.api = api.clone();
     }
     if let Some(password) = &cli_config.password {
-        config.0.password = password.clone();
+        config.password = password.clone();
     }
     if let Some(ca_cert_path) = &cli_config.ca_cert_path {
-        config.0.ca_cert_path = ca_cert_path.clone();
+        config.ca_cert_path = ca_cert_path.clone();
     }
-    config.0
+    config
 }
 
 #[tokio::main]
@@ -83,7 +83,7 @@ async fn main() -> AnyResult<()> {
     let cli_config = CliConfig::parse();
     info!("CLI config provided: {:?}", cli_config);
     if cli_config.config_init {
-        jetkvm_control::jetkvm_config::interactive_config_location().await?;
+        jetkvm_client::jetkvm_config::interactive_config_location().await?;
         return Ok(());
     }
     #[cfg(feature = "lua")]
@@ -118,14 +118,14 @@ async fn main() -> AnyResult<()> {
 
     // Build a subscriber with the filter layer and formatting layer.
     registry().with(env_filter).with(fmt::layer()).init();
-    info!("Starting jetkvm_control demo...");
+    info!("Starting jetkvm_client demo...");
 
     // Load configuration from file (or default) and override with CLI options.
     let config = load_and_override_config(&cli_config);
 
     // Validate that the critical field 'host' is set.
     if config.host.trim().is_empty() {
-        eprintln!("Error: No host specified. Please set 'host' in jetkvm_control.toml or provide it via --host / -H.");
+        eprintln!("Error: No host specified. Please set 'host' in jetkvm_client.toml or provide it via --host / -H.");
         CliConfig::command()
             .print_help()
             .expect("Failed to print help");
@@ -143,7 +143,7 @@ async fn main() -> AnyResult<()> {
     // Lua mode: if the "lua" feature is enabled, read and execute the provided Lua script.
     #[cfg(feature = "lua")]
     {
-        use jetkvm_control::lua_engine::LuaEngine;
+        use jetkvm_client::lua_engine::LuaEngine;
         use std::sync::Arc;
         use tokio::sync::Mutex;
 
@@ -198,8 +198,8 @@ info!("Executing Lua script from {}", &cli_config.lua_script);
     // Normal mode: if the "lua" feature is not enabled, perform normal actions.
     #[cfg(not(feature = "lua"))]
     {
-        use jetkvm_control::device::{rpc_get_device_id, rpc_ping};
-        use jetkvm_control::system::rpc_get_edid;
+        use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
+        use jetkvm_client::system::rpc_get_edid;
 
         let ping = rpc_ping(&client).await;
         info!("Ping: {:?}", ping);
