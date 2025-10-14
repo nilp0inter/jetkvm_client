@@ -32,39 +32,20 @@ The goal of this library is to be able to do programatically whatever a jetkvm u
       cd jetkvm_client
       ```
 
-2. **Configure Your Settings**
-
-    The project reads its configuration from either a jetkvm_client.toml file.
-    Run the following command to edit/create jetkvm_client.toml files.
+2. **Running the Project**
+    You can build and run the project with Cargo:
      ```bash
-     cargo run -- -c
-        -or-   
-     jetkvm_client -c
+     cargo run -- -H 192.168.1.100 -P mypassword
      ```
-
-    You can override values via the command-line.
-
-3. **Running the Project**
-    After setting up your configuration, you can build and run the project with Cargo:
-     ```bash
-     cargo run -- -H 192.168.1.100 lua-examples/windows-notepad-helloworld.lua
-     ```
-
-    This will compile the project and execute the window-notepad-helloworld.lua example.
   
 ## About the cmdline client
 
-The client (cargo run/jetkvm_client) is a simple ping if you don't have the `lua` feature enabled.
-
-If you enable the lua feature; jetkvm_client will expect a lua file to execute.
+The client (cargo run/jetkvm_client) is a simple client that connects to the JetKVM device, performs a few RPC calls to get device information, and then disconnects.
 
 ```
 A client for JetKVM over WebRTC.
 
-Usage: jetkvm_client [OPTIONS] <LUA_SCRIPT>
-
-Arguments:
-  <LUA_SCRIPT>  Path to the Lua script to execute
+Usage: jetkvm_client [OPTIONS]
 
 Options:
   -H, --host <HOST>          The host address to connect to
@@ -82,7 +63,14 @@ The api is subject to change.   This project adheres to the "Semantic Versioning
 
 example code for rust:
 ```rust
-let config = JetKvmConfig::load()?;
+let config = JetKvmConfig {
+    host: "192.168.1.100".to_string(),
+    port: "80".to_string(),
+    api: "/webrtc/session".to_string(),
+    password: "mypassword".to_string(),
+    ca_cert_path: "cert.pem".to_string(),
+    no_auto_logout: false,
+};
 let mut client = JetKvmRpcClient::new(config);
 
 if let Err(err) = client.connect().await {
@@ -108,31 +96,6 @@ send_return(&client).await.ok();
 sleep(Duration::from_millis(100)).await;
 send_ctrl_v(&client).await.ok();
 ```
-
-example code in lua:
-```lua
-print("Executing Lua script...")
-send_windows_key()
-delay(550)
-send_text("notepad")
-send_return()
-delay(250)
-delay(250)
-send_text("Hello World!")
-send_ctrl_a()
-send_ctrl_c()
-delay(250)
-send_ctrl_v()
-delay(250)
-send_ctrl_v()
-send_key_combinations({
-    { modifier = 0x04, keys = {0x3D}, hold = 100, wait = 1000 }, -- Alt+F4
-    { modifier = 0, keys = {0x4F}, wait = 250 }, -- Right arrow
-    { modifier = 0, keys = {0x28} },  -- Return (Enter)
-})
-```
-
-Check out the examples folder for additional detail.
 
 ## Contributions
 
