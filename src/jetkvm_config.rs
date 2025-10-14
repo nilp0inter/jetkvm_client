@@ -56,22 +56,22 @@ impl JetKvmConfig {
     pub fn load() -> Result<(Self, String, bool)> {
         // Define candidate configuration file locations.
         let mut config_paths = vec![
-            "jetkvm_control.toml".to_string(), // local directory
+            "jetkvm_client.toml".to_string(), // local directory
         ];
 
         // Check Cargo project root (development mode).
         if let Ok(manifest_dir) = env::var("CARGO_MANIFEST_DIR") {
-            config_paths.push(format!("{}/jetkvm_control.toml", manifest_dir));
+            config_paths.push(format!("{}/jetkvm_client.toml", manifest_dir));
         }
 
         // System-wide locations.
         #[cfg(any(target_os = "linux", target_os = "macos"))]
-        config_paths.push("/etc/jetkvm_control/jetkvm_control.toml".to_string());
+        config_paths.push("/etc/jetkvm_client/jetkvm_client.toml".to_string());
 
         #[cfg(target_os = "windows")]
         {
             // Use ProgramData for a system-wide config on Windows.
-            config_paths.push("C:\\ProgramData\\jetkvm_control\\jetkvm_control.toml".to_string());
+            config_paths.push("C:\\ProgramData\\jetkvm_client\\jetkvm_client.toml".to_string());
         }
 
         // Search for the first candidate that exists.
@@ -79,11 +79,11 @@ impl JetKvmConfig {
             let config_contents = fs::read_to_string(found_path)
                 .context("Failed to read config file")?;
             let config: JetKvmConfig = toml::from_str(&config_contents)
-                .context("Failed to parse jetkvm_control.toml")?;
+                .context("Failed to parse jetkvm_client.toml")?;
             println!("✅ Loaded config from: {}", found_path);
             Ok((config, found_path.clone(), true))
         } else {
-            println!("No jetkvm_control.toml found in any location.");
+            println!("No jetkvm_client.toml found in any location.");
             Ok((JetKvmConfig::default(), "".to_string(), false))
         }
     }
@@ -147,7 +147,7 @@ pub async fn interactive_config_init(path: &str) -> Result<()> {
     Ok(())
 }
 
-/// Interactively choose a configuration file location for jetkvm_control.toml.
+/// Interactively choose a configuration file location for jetkvm_client.toml.
 /// The candidate list is ordered such that:
 ///   1. CURRENT DIRECTORY has the highest precedence.
 ///   2. Cargo Project Root (CARGO_MANIFEST_DIR) is next.
@@ -183,7 +183,7 @@ pub async fn interactive_config_location() -> Result<()> {
     let candidates: Vec<(String, String)> = {
         // Compute the CURRENT DIRECTORY candidate as an absolute path.
         let current_dir = env::current_dir()?;
-        let current_dir_candidate: PathBuf = current_dir.join("jetkvm_control.toml");
+        let current_dir_candidate: PathBuf = current_dir.join("jetkvm_client.toml");
         let current_dir_str = current_dir_candidate.canonicalize()
             .unwrap_or(current_dir_candidate.clone())
             .to_string_lossy()
@@ -191,14 +191,14 @@ pub async fn interactive_config_location() -> Result<()> {
 
         // Compute the Cargo Project Root candidate.
         let cargo_candidate_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
-        let cargo_candidate: PathBuf = Path::new(&cargo_candidate_dir).join("jetkvm_control.toml");
+        let cargo_candidate: PathBuf = Path::new(&cargo_candidate_dir).join("jetkvm_client.toml");
         let cargo_candidate_str = cargo_candidate.canonicalize()
             .unwrap_or(cargo_candidate.clone())
             .to_string_lossy()
             .into_owned();
 
         // Define the SYSTEM-WIDE candidate.
-        let system_candidate_str = "/etc/jetkvm_control/jetkvm_control.toml".to_string();
+        let system_candidate_str = "/etc/jetkvm_client/jetkvm_client.toml".to_string();
 
         // Build candidates: if CURRENT DIRECTORY equals Cargo Project Root, include only Cargo.
         let mut vec = Vec::new();
@@ -214,21 +214,21 @@ pub async fn interactive_config_location() -> Result<()> {
     let candidates: Vec<(String, String)> = {
         // For Windows, compute the candidates using backslashes.
         let current_dir = env::current_dir()?;
-        let current_dir_candidate: PathBuf = current_dir.join("jetkvm_control.toml");
+        let current_dir_candidate: PathBuf = current_dir.join("jetkvm_client.toml");
         let current_dir_str = current_dir_candidate.canonicalize()
             .unwrap_or(current_dir_candidate.clone())
             .to_string_lossy()
             .into_owned();
 
         let cargo_candidate_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
-        let cargo_candidate: PathBuf = Path::new(&cargo_candidate_dir).join("jetkvm_control.toml");
+        let cargo_candidate: PathBuf = Path::new(&cargo_candidate_dir).join("jetkvm_client.toml");
         let cargo_candidate_str = cargo_candidate.canonicalize()
             .unwrap_or(cargo_candidate.clone())
             .to_string_lossy()
             .into_owned();
 
         // Use ProgramData for system-wide configuration on Windows.
-        let system_candidate_str = "C:\\ProgramData\\jetkvm_control\\jetkvm_control.toml".to_string();
+        let system_candidate_str = "C:\\ProgramData\\jetkvm_client\\jetkvm_client.toml".to_string();
 
         let mut vec = Vec::new();
         if current_dir_str != cargo_candidate_str {
