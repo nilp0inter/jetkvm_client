@@ -202,4 +202,3 @@ pub async fn rpc_left_click_and_drag_to_center(
         .await?;
     Ok(())
 }
-

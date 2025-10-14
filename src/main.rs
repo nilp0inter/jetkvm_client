@@ -1,6 +1,6 @@
 use anyhow::Result as AnyResult;
-use clap::{CommandFactory, Parser};
-use jetkvm_client::jetkvm_rpc_client::{JetKvmConfig, JetKvmRpcClient};
+use clap::Parser;
+use jetkvm_client::jetkvm_rpc_client::JetKvmRpcClient;
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, registry, EnvFilter};
@@ -66,18 +66,9 @@ async fn main() -> AnyResult<()> {
     registry().with(env_filter).with(fmt::layer()).init();
     info!("Starting jetkvm_client demo...");
 
-    // Load configuration from file (or default) and override with CLI options.
-    let config = JetKvmConfig {
-        host: cli_config.host,
-        port: cli_config.port,
-        api: cli_config.api,
-        password: cli_config.password,
-        ca_cert_path: cli_config.ca_cert_path,
-        no_auto_logout: false,
-    };
-
     // Create and connect the client.
-    let mut client = JetKvmRpcClient::new(config.clone());
+    let mut client =
+        JetKvmRpcClient::new(cli_config.host, cli_config.password, cli_config.api, false);
     if let Err(err) = client.connect().await {
         error!("Failed to connect to RPC server: {:?}", err);
         std::process::exit(1);

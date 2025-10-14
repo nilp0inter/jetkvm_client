@@ -468,4 +468,3 @@ pub async fn send_key_combinations(
 
     Ok(())
 }
-

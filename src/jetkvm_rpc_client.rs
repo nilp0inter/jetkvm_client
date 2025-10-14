@@ -1,5 +1,4 @@
 use crate::auth;
-use crate::jetkvm_config::JetKvmConfig;
 use crate::rpc_client::RpcClient;
 use anyhow::{anyhow, Result as AnyResult};
 use base64::{engine::general_purpose, Engine as _};
@@ -32,7 +31,10 @@ struct WebRTCSessionResponse {
 /// `JetKvmRpcClient` encapsulates both an authenticated HTTP client and an established
 /// WebRTC JSON-RPC connection.
 pub struct JetKvmRpcClient {
-    pub config: JetKvmConfig,
+    pub host: String,
+    pub password: String,
+    pub api: String,
+    pub no_auto_logout: bool,
     pub http_client: Option<Client>,
     pub rpc_client: Option<RpcClient>,
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
@@ -40,10 +42,13 @@ pub struct JetKvmRpcClient {
 
 impl JetKvmRpcClient {
     /// Creates a new `JetKvmRpcClient` without connecting.
-    pub fn new(config: JetKvmConfig) -> Self {
-        debug!("Initializing JetKvmRpcClient with config: {:?}", config);
+    pub fn new(host: String, password: String, api: String, no_auto_logout: bool) -> Self {
+        debug!("Initializing JetKvmRpcClient with host: {}", host);
         Self {
-            config,
+            host,
+            password,
+            api,
+            no_auto_logout,
             http_client: None,
             rpc_client: None,
             screen_size: Arc::new(Mutex::new(None)),
@@ -55,7 +60,7 @@ impl JetKvmRpcClient {
         debug!("Connecting to JetKVM...");
 
         // 1. Authenticate via HTTP.
-        let http_client = auth::login_local(&self.config.host, &self.config.password).await?;
+        let http_client = auth::login_local(&self.host, &self.password).await?;
         debug!("Authentication successful.");
         self.http_client = Some(http_client.clone());
 
@@ -115,7 +120,7 @@ impl JetKvmRpcClient {
         let session_request = WebRTCSessionRequest { sd: encoded_offer };
 
         // 7. Send the offer to the server.
-        let url = self.config.session_url();
+        let url = format!("http://{}{}", self.host, self.api);
         //debug!("Sending SDP Offer to {}", url);
 
         let response = http_client.post(&url).json(&session_request).send().await?;
@@ -189,7 +194,7 @@ impl JetKvmRpcClient {
     /// Asynchronous logout function for normal use.
     pub async fn logout(&self) -> AnyResult<()> {
         if let Some(client) = &self.http_client {
-            let url = format!("http://{}/auth/logout", self.config.host);
+            let url = format!("http://{}/auth/logout", self.host);
             let resp = client.post(&url).send().await;
 
             match resp {
@@ -215,12 +220,10 @@ impl JetKvmRpcClient {
 
     /// Gracefully disconnects by logging out and closing the RPC connection.
     pub async fn shutdown(&mut self) {
-        if self.config.no_auto_logout {
+        if self.no_auto_logout {
             tracing::info!("Auto-logout is disabled in config, skipping logout.");
-        } else {
-            if let Err(e) = self.logout().await {
-                tracing::warn!("Failed to logout on shutdown: {}", e);
-            }
+        } else if let Err(e) = self.logout().await {
+            tracing::warn!("Failed to logout on shutdown: {}", e);
         }
 
         if let Some(rpc) = self.rpc_client.take() {
