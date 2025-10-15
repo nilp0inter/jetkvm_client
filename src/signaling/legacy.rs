@@ -11,7 +11,6 @@ use webrtc::{
     dtls::extension::extension_use_srtp::SrtpProtectionProfile,
     peer_connection::{
         configuration::RTCConfiguration,
-        peer_connection_state::RTCPeerConnectionState,
         sdp::{sdp_type::RTCSdpType, session_description::RTCSessionDescription},
         RTCPeerConnection,
     },
