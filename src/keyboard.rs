@@ -88,25 +88,42 @@ fn char_to_hid(c: char) -> Option<(u8, u8)> {
 }
 
 /// Sends text as a series of keyboard events (press and release) over the JSON‑RPC channel.
-/// It iterates over each character in the provided text.
+/// This is a simple US-ASCII only implementation. For full layout support, use `send_text_with_layout`.
 pub async fn rpc_sendtext(
     client: &crate::jetkvm_rpc_client::JetKvmRpcClient,
     text: &str,
 ) -> AnyResult<()> {
-    // For each character, simulate a key press then a key release.
     for c in text.chars() {
         if let Some((modifier, keycode)) = char_to_hid(c) {
-            // Press key:
             crate::keyboard::rpc_keyboard_report(client, modifier as u64, vec![keycode]).await?;
-            // Wait a short period (e.g., 50 ms)
             sleep(Duration::from_millis(10)).await;
-            // Release key:
             crate::keyboard::rpc_keyboard_report(client, 0, vec![]).await?;
             sleep(Duration::from_millis(10)).await;
         } else {
             debug!("Unsupported character: {}", c);
         }
     }
+    Ok(())
+}
+
+/// Sends text using a specific keyboard layout with full support for accented characters and dead keys.
+pub async fn send_text_with_layout(
+    client: &crate::jetkvm_rpc_client::JetKvmRpcClient,
+    text: &str,
+    layout_code: &str,
+    delay_ms: u64,
+) -> AnyResult<()> {
+    use crate::text_to_macro::text_to_macro_steps_with_layout_code;
+
+    let macro_steps = text_to_macro_steps_with_layout_code(text, layout_code, delay_ms)?;
+
+    for step in macro_steps {
+        rpc_keyboard_report(client, step.modifier as u64, step.keys).await?;
+        sleep(Duration::from_millis(step.delay_ms)).await;
+        rpc_keyboard_report(client, 0, vec![]).await?;
+        sleep(Duration::from_millis(10)).await;
+    }
+
     Ok(())
 }
 

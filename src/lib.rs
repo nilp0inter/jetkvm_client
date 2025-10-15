@@ -2,10 +2,14 @@ pub mod auth;
 pub mod device;
 pub mod jetkvm_rpc_client;
 pub mod keyboard;
+pub mod keyboard_layout;
+pub mod keyboard_layouts;
+pub mod keyboard_mappings;
 pub mod mouse;
 pub mod rpc_client;
 pub mod signaling;
 pub mod system;
+pub mod text_to_macro;
 pub mod video;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;

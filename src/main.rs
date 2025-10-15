@@ -5,7 +5,7 @@ use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
 use jetkvm_client::keyboard::{
     rpc_keyboard_report, rpc_sendtext, send_ctrl_a, send_ctrl_c, send_ctrl_v, send_ctrl_x,
-    send_return, send_windows_key,
+    send_return, send_text_with_layout, send_windows_key,
 };
 use jetkvm_client::mouse::{
     rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_middle_click, rpc_move_mouse,
@@ -73,9 +73,18 @@ enum Commands {
         #[arg(long, num_args = 0..)]
         keys: Vec<u8>,
     },
-    /// Sends text as a series of keyboard events.
+    /// Sends text as a series of keyboard events (US ASCII only).
     #[command(name = "sendtext")]
     Sendtext { text: String },
+    /// Sends text using a specific keyboard layout (supports accents and special characters).
+    #[command(name = "send-text-with-layout")]
+    SendTextWithLayout {
+        text: String,
+        #[arg(long, default_value = "en-US")]
+        layout: String,
+        #[arg(long, default_value = "20")]
+        delay: u64,
+    },
     /// Sends a Return (Enter) key press.
     #[command(name = "send-return")]
     SendReturn,
@@ -197,6 +206,13 @@ async fn main() -> AnyResult<()> {
                     .map(|_| json!({ "status": "ok" }))
             }
             Commands::Sendtext { text } => rpc_sendtext(&client, &text)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendTextWithLayout {
+                text,
+                layout,
+                delay,
+            } => send_text_with_layout(&client, &text, &layout, delay)
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::SendReturn => send_return(&client)
