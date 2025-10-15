@@ -26,6 +26,7 @@ pub struct JetKvmRpcClient {
     pub api: String,
     pub no_auto_logout: bool,
     pub http_client: Option<Client>,
+    pub auth_token: Option<String>,
     pub rpc_client: Option<RpcClient>,
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
     pub signaling_method: SignalingMethod,
@@ -47,6 +48,7 @@ impl JetKvmRpcClient {
             api,
             no_auto_logout,
             http_client: None,
+            auth_token: None,
             rpc_client: None,
             screen_size: Arc::new(Mutex::new(None)),
             signaling_method,
@@ -58,21 +60,27 @@ impl JetKvmRpcClient {
         debug!("Connecting to JetKVM...");
 
         // 1. Authenticate via HTTP.
-        let http_client = auth::login_local(&self.host, &self.password).await?;
+        let (http_client, auth_token) = auth::login_local(&self.host, &self.password).await?;
         debug!("Authentication successful.");
         self.http_client = Some(http_client.clone());
+        self.auth_token = auth_token;
 
         let (_peer_connection, data_channel) = match self.signaling_method {
             SignalingMethod::Legacy => legacy::connect(&http_client, &self.host, &self.api).await?,
-            SignalingMethod::WebSocket => websocket::connect(&self.host).await?,
+            SignalingMethod::WebSocket => {
+                websocket::connect(&self.host, self.auth_token.as_deref()).await?
+            }
             SignalingMethod::Auto => {
-                match websocket::connect(&self.host).await {
+                match websocket::connect(&self.host, self.auth_token.as_deref()).await {
                     Ok(conn) => {
                         info!("Successfully connected using WebSocket signaling.");
                         conn
                     }
                     Err(e) => {
-                        warn!("WebSocket connection failed: {}. Falling back to legacy signaling.", e);
+                        warn!(
+                            "WebSocket connection failed: {}. Falling back to legacy signaling.",
+                            e
+                        );
                         legacy::connect(&http_client, &self.host, &self.api).await?
                     }
                 }

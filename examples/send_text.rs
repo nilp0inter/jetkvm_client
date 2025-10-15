@@ -66,28 +66,11 @@ async fn main() -> AnyResult<()> {
         std::process::exit(1);
     }
     client.wait_for_channel_open().await?;
-    send_windows_key(&client).await.ok();
-    sleep(Duration::from_millis(250)).await;
-    rpc_sendtext(&client, "notepad").await.ok();
-    sleep(Duration::from_millis(250)).await;
-    send_return(&client).await.ok();
-    sleep(Duration::from_millis(250)).await;
     info!("sending text");
     rpc_sendtext(&client, &cli_config.text).await.ok();
     sleep(Duration::from_millis(100)).await;
-    send_ctrl_a(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_x(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_ctrl_v(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
     send_return(&client).await.ok();
-    send_ctrl_v(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_return(&client).await.ok();
-    send_ctrl_v(&client).await.ok();
-    sleep(Duration::from_millis(100)).await;
-    send_return(&client).await.ok();
+    sleep(Duration::from_millis(250)).await;
 
     Ok(())
 }
