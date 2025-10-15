@@ -58,7 +58,7 @@ pub async fn connect(
 
     let (ws_stream, _) = if let Some(token) = auth_token {
         let mut request = url.into_client_request()?;
-        let cookie_value = format!("{}", token);
+        let cookie_value = token.to_string();
         request.headers_mut().insert(
             header::COOKIE,
             header::HeaderValue::from_str(&cookie_value)?,
