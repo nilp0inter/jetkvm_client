@@ -34,10 +34,7 @@ pub async fn login_local(host: &str, password: &str) -> AnyResult<(Client, Optio
             let cookie_str = cookie.to_str().unwrap_or_default();
             debug!("Set-Cookie: {}", cookie_str);
             if cookie_str.starts_with("authToken=") {
-                cookie_str
-                    .split(';')
-                    .next()
-                    .map(|s| s.trim().to_string())
+                cookie_str.split(';').next().map(|s| s.trim().to_string())
             } else {
                 None
             }

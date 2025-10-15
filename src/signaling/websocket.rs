@@ -15,8 +15,7 @@ use webrtc::{
     dtls::extension::extension_use_srtp::SrtpProtectionProfile,
     ice_transport::ice_candidate::{RTCIceCandidate, RTCIceCandidateInit},
     peer_connection::{
-        configuration::RTCConfiguration,
-        sdp::session_description::RTCSessionDescription,
+        configuration::RTCConfiguration, sdp::session_description::RTCSessionDescription,
         RTCPeerConnection,
     },
 };
@@ -77,10 +76,10 @@ pub async fn connect(
         SrtpProtectionProfile::Srtp_Aead_Aes_128_Gcm,
         SrtpProtectionProfile::Srtp_Aes128_Cm_Hmac_Sha1_80,
     ]);
-    
+
     let mut media_engine = MediaEngine::default();
     media_engine.register_default_codecs()?;
-    
+
     let api = APIBuilder::new()
         .with_setting_engine(setting_engine)
         .with_media_engine(media_engine)
@@ -90,38 +89,36 @@ pub async fn connect(
 
     // Set up ICE candidate handler to send candidates to the server
     let write_clone = Arc::clone(&write);
-    peer_connection.on_ice_candidate(Box::new(
-        move |c: Option<RTCIceCandidate>| {
-            let write_clone = Arc::clone(&write_clone);
-            Box::pin(async move {
-                if let Some(c) = c {
-                    match c.to_json() {
-                        Ok(candidate) => {
-                            let msg = SignalingMessage::NewIceCandidate(IceCandidate {
-                                candidate: candidate.candidate,
-                                sdp_mid: candidate.sdp_mid.unwrap_or_default(),
-                                sdp_m_line_index: candidate.sdp_mline_index.unwrap_or_default(),
-                            });
-                            match serde_json::to_string(&msg) {
-                                Ok(json_msg) => {
-                                    let mut w = write_clone.lock().await;
-                                    if let Err(e) = w.send(Message::Text(json_msg.into())).await {
-                                        warn!("Failed to send ICE candidate: {}", e);
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!("Failed to serialize ICE candidate: {}", e);
+    peer_connection.on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
+        let write_clone = Arc::clone(&write_clone);
+        Box::pin(async move {
+            if let Some(c) = c {
+                match c.to_json() {
+                    Ok(candidate) => {
+                        let msg = SignalingMessage::NewIceCandidate(IceCandidate {
+                            candidate: candidate.candidate,
+                            sdp_mid: candidate.sdp_mid.unwrap_or_default(),
+                            sdp_m_line_index: candidate.sdp_mline_index.unwrap_or_default(),
+                        });
+                        match serde_json::to_string(&msg) {
+                            Ok(json_msg) => {
+                                let mut w = write_clone.lock().await;
+                                if let Err(e) = w.send(Message::Text(json_msg.into())).await {
+                                    warn!("Failed to send ICE candidate: {}", e);
                                 }
                             }
-                        }
-                        Err(e) => {
-                            warn!("Failed to convert ICE candidate to JSON: {}", e);
+                            Err(e) => {
+                                warn!("Failed to serialize ICE candidate: {}", e);
+                            }
                         }
                     }
+                    Err(e) => {
+                        warn!("Failed to convert ICE candidate to JSON: {}", e);
+                    }
                 }
-            })
-        },
-    ));
+            }
+        })
+    }));
 
     // 2. Wait for device-metadata message
     if let Some(Ok(Message::Text(text))) = read.next().await {
@@ -159,14 +156,11 @@ pub async fn connect(
     let offer = peer_connection.create_offer(None).await?;
     peer_connection.set_local_description(offer.clone()).await?;
 
-    let offer_sd =
-        base64::engine::general_purpose::STANDARD.encode(serde_json::to_string(&offer)?);
+    let offer_sd = base64::engine::general_purpose::STANDARD.encode(serde_json::to_string(&offer)?);
     let offer_msg = SignalingMessage::Offer(OfferData { sd: offer_sd });
     let mut w = write.lock().await;
-    w.send(Message::Text(
-        serde_json::to_string(&offer_msg)?.into(),
-    ))
-    .await?;
+    w.send(Message::Text(serde_json::to_string(&offer_msg)?.into()))
+        .await?;
 
     // 5. Wait for answer
     if let Some(Ok(Message::Text(text))) = read.next().await {
@@ -255,7 +249,10 @@ mod tests {
             sdp_m_line_index: 1,
         });
         let json = serde_json::to_string(&msg).unwrap();
-        assert_eq!(json, r#"{"type":"new-ice-candidate","data":{"candidate":"candidate_str","sdpMid":"sdp_mid_str","sdpMLineIndex":1}}"#);
+        assert_eq!(
+            json,
+            r#"{"type":"new-ice-candidate","data":{"candidate":"candidate_str","sdpMid":"sdp_mid_str","sdpMLineIndex":1}}"#
+        );
         let deserialized: SignalingMessage = serde_json::from_str(&json).unwrap();
         matches!(deserialized, SignalingMessage::NewIceCandidate(_));
     }

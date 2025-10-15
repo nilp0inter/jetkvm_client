@@ -37,10 +37,10 @@ pub async fn connect(
         SrtpProtectionProfile::Srtp_Aead_Aes_128_Gcm,
         SrtpProtectionProfile::Srtp_Aes128_Cm_Hmac_Sha1_80,
     ]);
-    
+
     let mut media_engine = MediaEngine::default();
     media_engine.register_default_codecs()?;
-    
+
     let webrtc_api = APIBuilder::new()
         .with_setting_engine(setting_engine)
         .with_media_engine(media_engine)

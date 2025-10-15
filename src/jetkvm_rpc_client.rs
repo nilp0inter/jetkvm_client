@@ -3,13 +3,13 @@ use crate::rpc_client::RpcClient;
 use crate::signaling::{legacy, websocket};
 use crate::video::VideoFrameCapture;
 use anyhow::{anyhow, Result as AnyResult};
+use clap::ValueEnum;
 use reqwest::Client;
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tracing::{debug, info, warn};
-use clap::ValueEnum;
 
 #[derive(Clone, Debug, Default, ValueEnum)]
 pub enum SignalingMethod {

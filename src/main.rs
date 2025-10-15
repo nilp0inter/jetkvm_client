@@ -1,5 +1,5 @@
 use anyhow::Result as AnyResult;
-use base64::{Engine as _, engine::general_purpose};
+use base64::{engine::general_purpose, Engine as _};
 use clap::{CommandFactory, Parser};
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
@@ -64,9 +64,7 @@ enum Commands {
     GetEdid,
     /// Sets the EDID data.
     #[command(name = "set-edid")]
-    SetEdid {
-        edid: String,
-    },
+    SetEdid { edid: String },
     /// Sends a keyboard report with the given modifier and keys.
     #[command(name = "keyboard-report")]
     KeyboardReport {
@@ -77,9 +75,7 @@ enum Commands {
     },
     /// Sends text as a series of keyboard events.
     #[command(name = "sendtext")]
-    Sendtext {
-        text: String,
-    },
+    Sendtext { text: String },
     /// Sends a Return (Enter) key press.
     #[command(name = "send-return")]
     SendReturn,
@@ -100,46 +96,25 @@ enum Commands {
     SendWindowsKey,
     /// Sends an absolute mouse report with x, y coordinates and button state.
     #[command(name = "abs-mouse-report")]
-    AbsMouseReport {
-        x: i64,
-        y: i64,
-        buttons: u64,
-    },
+    AbsMouseReport { x: i64, y: i64, buttons: u64 },
     /// Sends a wheel report with the given wheelY value.
     #[command(name = "wheel-report")]
-    WheelReport {
-        wheel_y: i64,
-    },
+    WheelReport { wheel_y: i64 },
     /// Moves the mouse to the specified absolute coordinates.
     #[command(name = "move-mouse")]
-    MoveMouse {
-        x: i64,
-        y: i64,
-    },
+    MoveMouse { x: i64, y: i64 },
     /// Simulates a left mouse click at the specified coordinates.
     #[command(name = "left-click")]
-    LeftClick {
-        x: i64,
-        y: i64,
-    },
+    LeftClick { x: i64, y: i64 },
     /// Simulates a right mouse click at the specified coordinates.
     #[command(name = "right-click")]
-    RightClick {
-        x: i64,
-        y: i64,
-    },
+    RightClick { x: i64, y: i64 },
     /// Simulates a middle mouse click at the specified coordinates.
     #[command(name = "middle-click")]
-    MiddleClick {
-        x: i64,
-        y: i64,
-    },
+    MiddleClick { x: i64, y: i64 },
     /// Simulates a double left click at the specified coordinates.
     #[command(name = "double-click")]
-    DoubleClick {
-        x: i64,
-        y: i64,
-    },
+    DoubleClick { x: i64, y: i64 },
     /// Captures a screenshot as PNG (returns base64 encoded data URL).
     #[command(name = "screenshot")]
     Screenshot,
@@ -164,13 +139,8 @@ async fn main() -> AnyResult<()> {
     }
 
     // Create and connect the client.
-    let mut client = JetKvmRpcClient::new(
-        cli.host,
-        cli.password,
-        cli.api,
-        false,
-        cli.signaling_method,
-    );
+    let mut client =
+        JetKvmRpcClient::new(cli.host, cli.password, cli.api, false, cli.signaling_method);
     if let Err(err) = client.connect().await {
         let error_json = json!({ "error": format!("Failed to connect to RPC server: {:?}", err) });
         println!("{}", serde_json::to_string(&error_json)?);
@@ -182,22 +152,34 @@ async fn main() -> AnyResult<()> {
     while let Some(arg) = command_args.next() {
         let mut sub_args = vec![arg];
         while let Some(next_arg) = command_args.next() {
-            if Commands::command().get_subcommands().any(|c| c.get_name() == next_arg) {
+            if Commands::command()
+                .get_subcommands()
+                .any(|c| c.get_name() == next_arg)
+            {
                 // This is a new command, so we need to parse the previous one
-                command_args = vec![next_arg].into_iter().chain(command_args).collect::<Vec<_>>().into_iter();
+                command_args = vec![next_arg]
+                    .into_iter()
+                    .chain(command_args)
+                    .collect::<Vec<_>>()
+                    .into_iter();
                 break;
             }
             sub_args.push(next_arg);
         }
 
         let command = match Commands::try_parse_from(
-            std::iter::once("jetkvm_client".to_string()).chain(sub_args.into_iter()),
+            std::iter::once("jetkvm_client".to_string()).chain(sub_args.clone().into_iter()),
         ) {
             Ok(command) => command,
             Err(e) => {
                 e.exit();
             }
         };
+
+        let command_info = json!({
+            "command": sub_args[0],
+            "params": if sub_args.len() > 1 { json!(sub_args[1..].to_vec()) } else { json!([]) }
+        });
 
         let result = match command {
             Commands::Ping => rpc_ping(&client).await,
@@ -214,14 +196,24 @@ async fn main() -> AnyResult<()> {
             Commands::Sendtext { text } => rpc_sendtext(&client, &text)
                 .await
                 .map(|_| json!({ "status": "ok" })),
-            Commands::SendReturn => send_return(&client).await.map(|_| json!({ "status": "ok" })),
-            Commands::SendCtrlC => send_ctrl_c(&client).await.map(|_| json!({ "status": "ok" })),
-            Commands::SendCtrlV => send_ctrl_v(&client).await.map(|_| json!({ "status": "ok" })),
-            Commands::SendCtrlX => send_ctrl_x(&client).await.map(|_| json!({ "status": "ok" })),
-            Commands::SendCtrlA => send_ctrl_a(&client).await.map(|_| json!({ "status": "ok" })),
-            Commands::SendWindowsKey => {
-                send_windows_key(&client).await.map(|_| json!({ "status": "ok" }))
-            }
+            Commands::SendReturn => send_return(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlC => send_ctrl_c(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlV => send_ctrl_v(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlX => send_ctrl_x(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlA => send_ctrl_a(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendWindowsKey => send_windows_key(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
             Commands::AbsMouseReport { x, y, buttons } => {
                 rpc_abs_mouse_report(&client, x, y, buttons)
                     .await
@@ -246,12 +238,14 @@ async fn main() -> AnyResult<()> {
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::Screenshot => {
-                client.video_capture.capture_screenshot_png()
+                client
+                    .video_capture
+                    .capture_screenshot_png()
                     .await
                     .map(|png_data| {
                         let base64_data = general_purpose::STANDARD.encode(&png_data);
                         let data_url = format!("data:image/png;base64,{}", base64_data);
-                        json!({ 
+                        json!({
                             "status": "ok",
                             "format": "png",
                             "size": png_data.len(),
@@ -263,11 +257,19 @@ async fn main() -> AnyResult<()> {
 
         match result {
             Ok(value) => {
-                let result_json = json!({ "result": value });
+                let result_json = json!({
+                    "command": command_info["command"],
+                    "params": command_info["params"],
+                    "result": value
+                });
                 println!("{}", serde_json::to_string(&result_json)?);
             }
             Err(e) => {
-                let error_json = json!({ "error": format!("{}", e) });
+                let error_json = json!({
+                    "command": command_info["command"],
+                    "params": command_info["params"],
+                    "error": format!("{}", e)
+                });
                 println!("{}", serde_json::to_string(&error_json)?);
             }
         }
