@@ -4,7 +4,7 @@ description = "A client for JetKVM over WebRTC."
 license = "MIT"
 repository = "https://github.com/nilp0inter/jetkvm_client"
 homepage = "https://github.com/nilp0inter/jetkvm_client"
-version = "0.2.0"
+version = "0.0.1"
 edition = "2021"
 authors = ["Roberto Abdelkader Martínez Pérez <robertomartinezp@gmail.com>"]
 
