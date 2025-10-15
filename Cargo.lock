@@ -1797,6 +1797,7 @@ dependencies = [
  "hmac",
  "image",
  "lazy_static",
+ "once_cell",
  "openh264",
  "rand 0.9.2",
  "rcgen",
