@@ -118,6 +118,9 @@ enum Commands {
     /// Captures a screenshot as PNG (returns base64 encoded data URL).
     #[command(name = "screenshot")]
     Screenshot,
+    /// Waits for the specified number of milliseconds.
+    #[command(name = "wait")]
+    Wait { milliseconds: u64 },
 }
 
 #[tokio::main]
@@ -252,6 +255,10 @@ async fn main() -> AnyResult<()> {
                             "data": data_url
                         })
                     })
+            }
+            Commands::Wait { milliseconds } => {
+                tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
+                Ok(json!({ "status": "ok" }))
             }
         };
 
