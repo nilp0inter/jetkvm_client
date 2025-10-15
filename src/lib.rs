@@ -6,5 +6,6 @@ pub mod mouse;
 pub mod rpc_client;
 pub mod signaling;
 pub mod system;
+pub mod video;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;

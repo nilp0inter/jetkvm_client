@@ -139,6 +139,16 @@ enum Commands {
         x: i64,
         y: i64,
     },
+    /// Captures a screenshot and saves it to the specified path.
+    #[command(name = "screenshot")]
+    Screenshot {
+        #[arg(long)]
+        output: String,
+        #[arg(long)]
+        width: Option<u32>,
+        #[arg(long)]
+        height: Option<u32>,
+    },
 }
 
 #[tokio::main]
@@ -252,6 +262,18 @@ async fn main() -> AnyResult<()> {
             Commands::DoubleClick { x, y } => rpc_double_click(&client, x, y)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::Screenshot { output, width, height } => {
+                let (w, h) = match (width, height) {
+                    (Some(w), Some(h)) => (w, h),
+                    _ => {
+                        let size = client.screen_size.lock().await;
+                        size.unwrap_or((1920, 1080))
+                    }
+                };
+                client.video_capture.save_screenshot_as_png(&output, w, h)
+                    .await
+                    .map(|_| json!({ "status": "ok", "path": output }))
+            }
         };
 
         match result {

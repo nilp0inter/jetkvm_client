@@ -52,6 +52,12 @@ rcgen = { version = "0.13.2", optional = true }
 sha2 = { version = "0.10.8", optional = true }
 tokio-tungstenite = "0.28.0"
 futures-util = "0.3.31"
+image = "0.25.5"
+bytes = "1.9.0"
+openh264 = "0.6.1"
+gstreamer = "0.23"
+gstreamer-app = "0.23"
+gstreamer-video = "0.23"
 
 
 [dev-dependencies]

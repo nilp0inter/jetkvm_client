@@ -10,7 +10,8 @@ The goal of this library is to be able to do programatically whatever a jetkvm u
 
 ## TODO
 
-- [ ] Screen capture (screenshot and video)
+- [x] Screen capture (screenshot)
+- [ ] Video recording from WebRTC stream
 
 ## Features
 
@@ -149,3 +150,80 @@ This project is licensed under the MIT License. See LICENSE for details.
 
 ## Contributing
 Contributions are welcome! Please submit a pull request or open an issue to discuss changes.
+
+## Features
+
+- **Keyboard Control**: Send keystrokes and text to the remote system
+- **Mouse Control**: Move the mouse cursor and simulate clicks
+- **Video Capture**: Capture screenshots from the WebRTC video feed
+- **System Management**: Get device information and configure EDID settings
+
+## Screenshot Capture
+
+The library now supports capturing screenshots from the WebRTC video stream:
+
+### Using the CLI
+
+```bash
+# Capture a screenshot (uses default or detected resolution)
+jetkvm_client -H 192.168.1.100:80 -P mypassword screenshot --output screenshot.png
+
+# Capture with specific resolution
+jetkvm_client -H 192.168.1.100:80 -P mypassword screenshot --output screenshot.png --width 1920 --height 1080
+```
+
+### Using the Example
+
+```bash
+# Run the screenshot example
+cargo run --example screenshot -- 192.168.1.100:80 mypassword screenshot.png
+```
+
+### Using as a Library
+
+```rust
+use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
+use tokio::time::{sleep, Duration};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let mut client = JetKvmRpcClient::new(
+        "192.168.1.100:80".to_string(),
+        "mypassword".to_string(),
+        "/webrtc/session".to_string(),
+        false,
+        SignalingMethod::Auto,
+    );
+
+    client.connect().await?;
+    client.wait_for_channel_open().await?;
+
+    // Wait for video track to be established
+    sleep(Duration::from_secs(2)).await;
+
+    // Capture screenshot
+    let (width, height) = {
+        let size = client.screen_size.lock().await;
+        size.unwrap_or((1920, 1080))
+    };
+
+    client.video_capture
+        .save_screenshot_as_png("screenshot.png", width, height)
+        .await?;
+
+    client.shutdown().await;
+    Ok(())
+}
+```
+
+## How It Works
+
+The screenshot functionality works by:
+
+1. Establishing a WebRTC connection with the JetKVM device
+2. Adding a video transceiver to receive the video stream
+3. Capturing RTP packets from the video track
+4. Decoding the raw frame data into PNG images
+
+The video feed is received through WebRTC's media stream, similar to how the TypeScript web client displays video.
+
