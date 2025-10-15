@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result as AnyResult};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{debug, info};
+use tracing::info;
 use webrtc::track::track_remote::TrackRemote;
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -32,7 +32,7 @@ impl VideoFrameCapture {
 
 
 
-    pub async fn save_screenshot_as_png(&self, output_path: &str, _width: u32, _height: u32) -> AnyResult<()> {
+    pub async fn capture_screenshot_png(&self) -> AnyResult<Vec<u8>> {
         gst::init()?;
         
         let track_guard = self.track.lock().await;
@@ -69,34 +69,38 @@ impl VideoFrameCapture {
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
         let pngenc = gst::ElementFactory::make("pngenc").build()?;
         
-        let identity = gst::ElementFactory::make("identity")
-            .property("signal-handoffs", true)
-            .property("sync", true)
-            .build()?;
-        
-        let filesink = gst::ElementFactory::make("filesink")
-            .property("location", output_path)
+        let appsink = gst::ElementFactory::make("appsink")
+            .property("emit-signals", true)
             .property("sync", false)
             .build()?;
         
         pipeline.add_many(&[
             &appsrc, &capsfilter, &rtph264depay, &h264parse,
-            &avdec_h264, &videoconvert, &pngenc, &identity, &filesink
+            &avdec_h264, &videoconvert, &pngenc, &appsink
         ])?;
         
         gst::Element::link_many(&[
             &appsrc, &capsfilter, &rtph264depay, &h264parse,
-            &avdec_h264, &videoconvert, &pngenc, &identity, &filesink
+            &avdec_h264, &videoconvert, &pngenc, &appsink
         ])?;
         
         let appsrc = appsrc.dynamic_cast::<gst_app::AppSrc>().unwrap();
+        let appsink = appsink.dynamic_cast::<gst_app::AppSink>().unwrap();
         
-        let (frame_tx, mut frame_rx) = tokio::sync::mpsc::channel::<()>(1);
+        let (frame_tx, mut frame_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(1);
         
-        identity.connect("handoff", false, move |_| {
-            let _ = frame_tx.try_send(());
-            None
-        });
+        appsink.set_callbacks(
+            gst_app::AppSinkCallbacks::builder()
+                .new_sample(move |appsink| {
+                    let sample = appsink.pull_sample().map_err(|_| gst::FlowError::Error)?;
+                    let buffer = sample.buffer().ok_or(gst::FlowError::Error)?;
+                    let map = buffer.map_readable().map_err(|_| gst::FlowError::Error)?;
+                    let data = map.as_slice().to_vec();
+                    let _ = frame_tx.try_send(data);
+                    Ok(gst::FlowSuccess::Ok)
+                })
+                .build(),
+        );
         
         info!("Starting pipeline...");
         pipeline.set_state(gst::State::Playing)?;
@@ -147,46 +151,23 @@ impl VideoFrameCapture {
         let timeout = tokio::time::sleep(tokio::time::Duration::from_secs(10));
         tokio::pin!(timeout);
         
-        tokio::select! {
-            _ = frame_rx.recv() => {
-                info!("First frame written, stopping pipeline");
+        let png_data = tokio::select! {
+            Some(data) = frame_rx.recv() => {
+                info!("First frame captured ({} bytes)", data.len());
+                data
             }
             _ = &mut timeout => {
                 return Err(anyhow!("Timeout waiting for first frame"));
             }
-        }
+        };
         
         let _ = appsrc.end_of_stream();
         feed_task.abort();
         
-        let bus = pipeline.bus().unwrap();
-        for msg in bus.iter_timed(gst::ClockTime::from_seconds(2)) {
-            use gst::MessageView;
-            match msg.view() {
-                MessageView::Eos(..) => {
-                    break;
-                }
-                MessageView::Error(err) => {
-                    pipeline.set_state(gst::State::Null)?;
-                    return Err(anyhow!(
-                        "Error from {:?}: {} ({:?})",
-                        err.src().map(|s| s.path_string()),
-                        err.error(),
-                        err.debug()
-                    ));
-                }
-                _ => {}
-            }
-        }
-        
         pipeline.set_state(gst::State::Null)?;
         
-        if std::path::Path::new(output_path).exists() && std::fs::metadata(output_path)?.len() > 0 {
-            info!("Screenshot saved to {}", output_path);
-            Ok(())
-        } else {
-            Err(anyhow!("Screenshot file was not created"))
-        }
+        info!("Screenshot captured successfully");
+        Ok(png_data)
     }
 }
 

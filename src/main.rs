@@ -1,4 +1,5 @@
 use anyhow::Result as AnyResult;
+use base64::{Engine as _, engine::general_purpose};
 use clap::{CommandFactory, Parser};
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
@@ -139,16 +140,9 @@ enum Commands {
         x: i64,
         y: i64,
     },
-    /// Captures a screenshot and saves it to the specified path.
+    /// Captures a screenshot as PNG (returns base64 encoded data URL).
     #[command(name = "screenshot")]
-    Screenshot {
-        #[arg(long)]
-        output: String,
-        #[arg(long)]
-        width: Option<u32>,
-        #[arg(long)]
-        height: Option<u32>,
-    },
+    Screenshot,
 }
 
 #[tokio::main]
@@ -262,17 +256,19 @@ async fn main() -> AnyResult<()> {
             Commands::DoubleClick { x, y } => rpc_double_click(&client, x, y)
                 .await
                 .map(|_| json!({ "status": "ok" })),
-            Commands::Screenshot { output, width, height } => {
-                let (w, h) = match (width, height) {
-                    (Some(w), Some(h)) => (w, h),
-                    _ => {
-                        let size = client.screen_size.lock().await;
-                        size.unwrap_or((1920, 1080))
-                    }
-                };
-                client.video_capture.save_screenshot_as_png(&output, w, h)
+            Commands::Screenshot => {
+                client.video_capture.capture_screenshot_png()
                     .await
-                    .map(|_| json!({ "status": "ok", "path": output }))
+                    .map(|png_data| {
+                        let base64_data = general_purpose::STANDARD.encode(&png_data);
+                        let data_url = format!("data:image/png;base64,{}", base64_data);
+                        json!({ 
+                            "status": "ok",
+                            "format": "png",
+                            "size": png_data.len(),
+                            "data": data_url
+                        })
+                    })
             }
         };
 
