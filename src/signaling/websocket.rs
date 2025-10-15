@@ -4,7 +4,10 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{client::IntoClientRequest, http::header, protocol::Message},
+};
 use tracing::{debug, info, warn};
 use webrtc::{
     api::{media_engine::MediaEngine, APIBuilder},
@@ -49,9 +52,22 @@ enum SignalingMessage {
 
 pub async fn connect(
     host: &str,
+    auth_token: Option<&str>,
 ) -> AnyResult<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>)> {
     let url = format!("ws://{}/webrtc/signaling/client", host);
-    let (ws_stream, _) = connect_async(url).await?;
+
+    let (ws_stream, _) = if let Some(token) = auth_token {
+        let mut request = url.into_client_request()?;
+        let cookie_value = format!("{}", token);
+        request.headers_mut().insert(
+            header::COOKIE,
+            header::HeaderValue::from_str(&cookie_value)?,
+        );
+        connect_async(request).await?
+    } else {
+        connect_async(url).await?
+    };
+
     let (write, mut read) = ws_stream.split();
     let write = Arc::new(Mutex::new(write));
 
