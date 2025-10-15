@@ -74,12 +74,12 @@ impl VideoFrameCapture {
             .property("sync", false)
             .build()?;
         
-        pipeline.add_many(&[
+        pipeline.add_many([
             &appsrc, &capsfilter, &rtph264depay, &h264parse,
             &avdec_h264, &videoconvert, &pngenc, &appsink
         ])?;
         
-        gst::Element::link_many(&[
+        gst::Element::link_many([
             &appsrc, &capsfilter, &rtph264depay, &h264parse,
             &avdec_h264, &videoconvert, &pngenc, &appsink
         ])?;
@@ -112,38 +112,33 @@ impl VideoFrameCapture {
         let appsrc_clone = appsrc.clone();
         let track_clone = track.clone();
         let feed_task = tokio::spawn(async move {
-            loop {
-                match track_clone.read_rtp().await {
-                    Ok((rtp_packet, _)) => {
-                        let header_size = 12 + (rtp_packet.header.csrc.len() * 4);
-                        let total_size = header_size + rtp_packet.payload.len();
-                        let mut packet_bytes = Vec::with_capacity(total_size);
-                        
-                        let b0 = (rtp_packet.header.version << 6) | 
-                                 ((rtp_packet.header.padding as u8) << 5) |
-                                 ((rtp_packet.header.extension as u8) << 4) |
-                                 (rtp_packet.header.csrc.len() as u8);
-                        packet_bytes.push(b0);
-                        
-                        let b1 = ((rtp_packet.header.marker as u8) << 7) | rtp_packet.header.payload_type;
-                        packet_bytes.push(b1);
-                        
-                        packet_bytes.extend_from_slice(&rtp_packet.header.sequence_number.to_be_bytes());
-                        packet_bytes.extend_from_slice(&rtp_packet.header.timestamp.to_be_bytes());
-                        packet_bytes.extend_from_slice(&rtp_packet.header.ssrc.to_be_bytes());
-                        
-                        for csrc in &rtp_packet.header.csrc {
-                            packet_bytes.extend_from_slice(&csrc.to_be_bytes());
-                        }
-                        
-                        packet_bytes.extend_from_slice(&rtp_packet.payload);
-                        
-                        let buffer = gst::Buffer::from_slice(packet_bytes);
-                        if appsrc_clone.push_buffer(buffer).is_err() {
-                            break;
-                        }
-                    }
-                    Err(_) => break,
+            while let Ok((rtp_packet, _)) = track_clone.read_rtp().await {
+                let header_size = 12 + (rtp_packet.header.csrc.len() * 4);
+                let total_size = header_size + rtp_packet.payload.len();
+                let mut packet_bytes = Vec::with_capacity(total_size);
+                
+                let b0 = (rtp_packet.header.version << 6) | 
+                         ((rtp_packet.header.padding as u8) << 5) |
+                         ((rtp_packet.header.extension as u8) << 4) |
+                         (rtp_packet.header.csrc.len() as u8);
+                packet_bytes.push(b0);
+                
+                let b1 = ((rtp_packet.header.marker as u8) << 7) | rtp_packet.header.payload_type;
+                packet_bytes.push(b1);
+                
+                packet_bytes.extend_from_slice(&rtp_packet.header.sequence_number.to_be_bytes());
+                packet_bytes.extend_from_slice(&rtp_packet.header.timestamp.to_be_bytes());
+                packet_bytes.extend_from_slice(&rtp_packet.header.ssrc.to_be_bytes());
+                
+                for csrc in &rtp_packet.header.csrc {
+                    packet_bytes.extend_from_slice(&csrc.to_be_bytes());
+                }
+                
+                packet_bytes.extend_from_slice(&rtp_packet.payload);
+                
+                let buffer = gst::Buffer::from_slice(packet_bytes);
+                if appsrc_clone.push_buffer(buffer).is_err() {
+                    break;
                 }
             }
         });
