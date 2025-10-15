@@ -39,6 +39,10 @@ struct Cli {
     #[arg(short = 'v', long)]
     verbose: bool,
 
+    /// Suppress logging output.
+    #[arg(short = 'q', long)]
+    quiet: bool,
+
     #[arg(short = 'C', long, default_value = "cert.pem")]
     ca_cert_path: String,
 
@@ -151,24 +155,26 @@ async fn main() -> AnyResult<()> {
     // Parse CLI arguments.
     let cli = Cli::parse();
 
-    let filter_directive = if cli.verbose {
-        "debug"
-    } else {
-        "debug,\
-         webrtc_sctp=off,\
-         webrtc::peer_connection=off,\
-         webrtc_dtls=off,\
-         webrtc_mdns=off,\
-         hyper_util::client=off,\
-         webrtc_data::data_channel=off,\
-         webrtc_ice=off"
-    };
+    if !cli.quiet {
+        let filter_directive = if cli.verbose {
+            "debug"
+        } else {
+            "debug,\
+             webrtc_sctp=off,\
+             webrtc::peer_connection=off,\
+             webrtc_dtls=off,\
+             webrtc_mdns=off,\
+             hyper_util::client=off,\
+             webrtc_data::data_channel=off,\
+             webrtc_ice=off"
+        };
 
-    registry()
-        .with(EnvFilter::new(filter_directive))
-        .with(fmt::layer())
-        .init();
-    info!("Starting jetkvm_client...");
+        registry()
+            .with(EnvFilter::new(filter_directive))
+            .with(fmt::layer().with_writer(std::io::stderr))
+            .init();
+        info!("Starting jetkvm_client...");
+    }
 
     // Create and connect the client.
     let mut client = JetKvmRpcClient::new(
