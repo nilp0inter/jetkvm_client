@@ -14,7 +14,11 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            rustup
+            cargo
+            rustc
+            rustfmt
+            clippy
+            rust-analyzer
             gcc
             openssl
             pkg-config
