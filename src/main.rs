@@ -45,6 +45,10 @@ struct Cli {
     /// The signaling method to use.
     #[arg(long, value_enum, default_value_t = SignalingMethod::Auto)]
     signaling_method: SignalingMethod,
+
+    /// The sequence of commands to execute.
+    #[arg(required = true, num_args = 1.., trailing_var_arg = true)]
+    commands: Vec<String>,
 }
 
 #[derive(Parser, Debug)]
@@ -59,7 +63,9 @@ enum Commands {
     GetEdid,
     /// Sets the EDID data.
     #[command(name = "set-edid")]
-    SetEdid { edid: String },
+    SetEdid {
+        edid: String,
+    },
     /// Sends a keyboard report with the given modifier and keys.
     #[command(name = "keyboard-report")]
     KeyboardReport {
@@ -70,7 +76,9 @@ enum Commands {
     },
     /// Sends text as a series of keyboard events.
     #[command(name = "sendtext")]
-    Sendtext { text: String },
+    Sendtext {
+        text: String,
+    },
     /// Sends a Return (Enter) key press.
     #[command(name = "send-return")]
     SendReturn,
@@ -98,22 +106,39 @@ enum Commands {
     },
     /// Sends a wheel report with the given wheelY value.
     #[command(name = "wheel-report")]
-    WheelReport { wheel_y: i64 },
+    WheelReport {
+        wheel_y: i64,
+    },
     /// Moves the mouse to the specified absolute coordinates.
     #[command(name = "move-mouse")]
-    MoveMouse { x: i64, y: i64 },
+    MoveMouse {
+        x: i64,
+        y: i64,
+    },
     /// Simulates a left mouse click at the specified coordinates.
     #[command(name = "left-click")]
-    LeftClick { x: i64, y: i64 },
+    LeftClick {
+        x: i64,
+        y: i64,
+    },
     /// Simulates a right mouse click at the specified coordinates.
     #[command(name = "right-click")]
-    RightClick { x: i64, y: i64 },
+    RightClick {
+        x: i64,
+        y: i64,
+    },
     /// Simulates a middle mouse click at the specified coordinates.
     #[command(name = "middle-click")]
-    MiddleClick { x: i64, y: i64 },
+    MiddleClick {
+        x: i64,
+        y: i64,
+    },
     /// Simulates a double left click at the specified coordinates.
     #[command(name = "double-click")]
-    DoubleClick { x: i64, y: i64 },
+    DoubleClick {
+        x: i64,
+        y: i64,
+    },
 }
 
 #[tokio::main]
@@ -123,16 +148,8 @@ async fn main() -> AnyResult<()> {
     rustls::crypto::aws_lc_rs::default_provider()
         .install_default()
         .ok();
-
-    let mut args = std::env::args();
-    let _ = args.next(); // Skip the program name
-
-    let cli = match Cli::try_parse_from(args.by_ref()) {
-        Ok(cli) => cli,
-        Err(e) => {
-            e.exit();
-        }
-    };
+    // Parse CLI arguments.
+    let cli = Cli::parse();
 
     let filter_directive = if cli.verbose {
         "debug"
@@ -147,9 +164,13 @@ async fn main() -> AnyResult<()> {
          webrtc_ice=off"
     };
 
-    registry().with(EnvFilter::new(filter_directive)).with(fmt::layer()).init();
+    registry()
+        .with(EnvFilter::new(filter_directive))
+        .with(fmt::layer())
+        .init();
     info!("Starting jetkvm_client...");
 
+    // Create and connect the client.
     let mut client = JetKvmRpcClient::new(
         cli.host,
         cli.password,
@@ -157,94 +178,90 @@ async fn main() -> AnyResult<()> {
         false,
         cli.signaling_method,
     );
-
     if let Err(err) = client.connect().await {
         let error_json = json!({ "error": format!("Failed to connect to RPC server: {:?}", err) });
         println!("{}", serde_json::to_string(&error_json)?);
-        std::process::exit(1);
+    } else {
+        client.wait_for_channel_open().await?;
     }
-    client.wait_for_channel_open().await?;
 
-    loop {
-        match Commands::try_parse_from(args.by_ref()) {
-            Ok(command) => {
-                let result = match command {
-                    Commands::Ping => rpc_ping(&client).await,
-                    Commands::GetDeviceId => rpc_get_device_id(&client).await.map(|r| json!(r)),
-                    Commands::GetEdid => rpc_get_edid(&client).await.map(|r| json!(r)),
-                    Commands::SetEdid { edid } => rpc_set_edid(&client, edid)
-                        .await
-                        .map(|_| json!({ "status": "ok" })),
-                    Commands::KeyboardReport { modifier, keys } => rpc_keyboard_report(
-                        &client, modifier, keys,
-                    )
+    let mut command_args = cli.commands.into_iter();
+    while let Some(arg) = command_args.next() {
+        let mut sub_args = vec![arg];
+        while let Some(next_arg) = command_args.next() {
+            if Commands::command().get_subcommands().any(|c| c.get_name() == next_arg) {
+                // This is a new command, so we need to parse the previous one
+                command_args = vec![next_arg].into_iter().chain(command_args).collect::<Vec<_>>().into_iter();
+                break;
+            }
+            sub_args.push(next_arg);
+        }
+
+        let command = match Commands::try_parse_from(
+            std::iter::once("jetkvm_client".to_string()).chain(sub_args.into_iter()),
+        ) {
+            Ok(command) => command,
+            Err(e) => {
+                e.exit();
+            }
+        };
+
+        let result = match command {
+            Commands::Ping => rpc_ping(&client).await,
+            Commands::GetDeviceId => rpc_get_device_id(&client).await.map(|r| json!(r)),
+            Commands::GetEdid => rpc_get_edid(&client).await.map(|r| json!(r)),
+            Commands::SetEdid { edid } => rpc_set_edid(&client, edid)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::KeyboardReport { modifier, keys } => {
+                rpc_keyboard_report(&client, modifier, keys)
                     .await
-                    .map(|_| json!({ "status": "ok" })),
-                    Commands::Sendtext { text } => {
-                        rpc_sendtext(&client, &text)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::SendReturn => send_return(&client).await.map(|_| json!({ "status": "ok" })),
-                    Commands::SendCtrlC => send_ctrl_c(&client).await.map(|_| json!({ "status": "ok" })),
-                    Commands::SendCtrlV => send_ctrl_v(&client).await.map(|_| json!({ "status": "ok" })),
-                    Commands::SendCtrlX => send_ctrl_x(&client).await.map(|_| json!({ "status": "ok" })),
-                    Commands::SendCtrlA => send_ctrl_a(&client).await.map(|_| json!({ "status": "ok" })),
-                    Commands::SendWindowsKey => {
-                        send_windows_key(&client).await.map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::AbsMouseReport { x, y, buttons } => {
-                        rpc_abs_mouse_report(&client, x, y, buttons)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::WheelReport { wheel_y } => rpc_wheel_report(&client, wheel_y)
-                        .await
-                        .map(|_| json!({ "status": "ok" })),
-                    Commands::MoveMouse { x, y } => {
-                        rpc_move_mouse(&client, x, y)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::LeftClick { x, y } => {
-                        rpc_left_click(&client, x, y)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::RightClick { x, y } => {
-                        rpc_right_click(&client, x, y)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::MiddleClick { x, y } => {
-                        rpc_middle_click(&client, x, y)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                    Commands::DoubleClick { x, y } => {
-                        rpc_double_click(&client, x, y)
-                            .await
-                            .map(|_| json!({ "status": "ok" }))
-                    }
-                };
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::Sendtext { text } => rpc_sendtext(&client, &text)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendReturn => send_return(&client).await.map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlC => send_ctrl_c(&client).await.map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlV => send_ctrl_v(&client).await.map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlX => send_ctrl_x(&client).await.map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlA => send_ctrl_a(&client).await.map(|_| json!({ "status": "ok" })),
+            Commands::SendWindowsKey => {
+                send_windows_key(&client).await.map(|_| json!({ "status": "ok" }))
+            }
+            Commands::AbsMouseReport { x, y, buttons } => {
+                rpc_abs_mouse_report(&client, x, y, buttons)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::WheelReport { wheel_y } => rpc_wheel_report(&client, wheel_y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::MoveMouse { x, y } => rpc_move_mouse(&client, x, y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::LeftClick { x, y } => rpc_left_click(&client, x, y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::RightClick { x, y } => rpc_right_click(&client, x, y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::MiddleClick { x, y } => rpc_middle_click(&client, x, y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::DoubleClick { x, y } => rpc_double_click(&client, x, y)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+        };
 
-                match result {
-                    Ok(value) => {
-                        let result_json = json!({ "result": value });
-                        println!("{}", serde_json::to_string(&result_json)?);
-                    }
-                    Err(e) => {
-                        let error_json = json!({ "error": format!("{}", e) });
-                        println!("{}", serde_json::to_string(&error_json)?);
-                    }
-                }
+        match result {
+            Ok(value) => {
+                let result_json = json!({ "result": value });
+                println!("{}", serde_json::to_string(&result_json)?);
             }
             Err(e) => {
-                if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand {
-                    break;
-                }
-                let mut cmd = Commands::command();
-                e.format(&mut cmd).exit();
+                let error_json = json!({ "error": format!("{}", e) });
+                println!("{}", serde_json::to_string(&error_json)?);
             }
         }
     }

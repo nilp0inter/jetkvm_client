@@ -38,23 +38,66 @@ The goal of this library is to be able to do programatically whatever a jetkvm u
      cargo run -- -H 192.168.1.100 -P mypassword
      ```
   
-## About the cmdline client
+## Usage
 
-The client (cargo run/jetkvm_client) is a simple client that connects to the JetKVM device, performs a few RPC calls to get device information, and then disconnects.
+The `jetkvm_client` executable provides a powerful command-line interface for interacting with your JetKVM device. It uses a subcommand-based system, and you can chain multiple commands together in a single execution, similar to `xdotool`.
 
+All output is a JSON Lines stream, where each line is a JSON object representing the result of a command. This makes it easy to parse the output in scripts.
+
+### Basic Syntax
+
+```bash
+jetkvm_client [GLOBAL_OPTIONS] COMMAND_1 [ARGS] COMMAND_2 [ARGS] ...
 ```
-A client for JetKVM over WebRTC.
 
-Usage: jetkvm_client [OPTIONS]
+### Global Options
 
-Options:
-  -H, --host <HOST>          The host address to connect to
-  -p, --port <PORT>          The port number to use
-  -a, --api <API>            The API endpoint
-  -P, --password <PASSWORD>  The password for authentication
-  -v, --verbose              Enable verbose logging (include logs from webrtc_sctp)
-  -h, --help                 Print help
-  -V, --version              Print version
+These options control the connection to the JetKVM device and must be provided before any commands.
+
+- `-H, --host <HOST>`: The host address of the JetKVM device.
+- `-P, --password <PASSWORD>`: The password for authentication.
+- `-p, --port <PORT>`: The port number to use (default: 80).
+- `-a, --api <API>`: The API endpoint (default: /webrtc/session).
+- `-v, --verbose`: Enable verbose logging.
+
+### Examples
+
+**Get the device ID:**
+
+```bash
+cargo run -- -H 10.4.1.194 -P password get-device-id
+```
+
+**Output:**
+
+```json
+{"result":"JTD22510012"}
+```
+
+**Chain multiple commands:**
+
+This example gets the device ID and then sends a ping.
+
+```bash
+cargo run -- -H 10.4.1.194 -P password get-device-id ping
+```
+
+**Output:**
+
+```json
+{"result":"JTD22510012"}
+{"result":{"jsonrpc":"2.0","result":{},"id":1}}
+```
+
+**Send text to the remote machine:**
+
+```bash
+cargo run -- -H 10.4.1.194 -P password sendtext "Hello, JetKVM!"
+```
+
+**Output:**
+```json
+{"result":{"status":"ok"}}
 ```
 
 ## What's the code look like
