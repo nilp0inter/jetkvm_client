@@ -1,6 +1,6 @@
 use anyhow::Result as AnyResult;
 use clap::Parser;
-use jetkvm_client::jetkvm_rpc_client::JetKvmRpcClient;
+use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
 use jetkvm_client::keyboard::*;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
@@ -35,6 +35,10 @@ struct CliConfig {
 
     #[arg(short = 'C', long, default_value = "cert.pem")]
     ca_cert_path: String,
+
+    /// The signaling method to use.
+    #[arg(long, value_enum, default_value_t = SignalingMethod::Auto)]
+    signaling_method: SignalingMethod,
 }
 
 #[tokio::main]
@@ -54,6 +58,7 @@ async fn main() -> AnyResult<()> {
         cli_config.password,
         cli_config.api,
         false,
+        cli_config.signaling_method,
     );
 
     if let Err(err) = client.connect().await {

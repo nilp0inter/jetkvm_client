@@ -1,6 +1,6 @@
 use anyhow::Result as AnyResult;
 use clap::Parser;
-use jetkvm_client::jetkvm_rpc_client::JetKvmRpcClient;
+use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
 use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, registry, EnvFilter};
@@ -30,6 +30,10 @@ struct CliConfig {
 
     #[arg(short = 'C', long, default_value = "cert.pem")]
     ca_cert_path: String,
+
+    /// The signaling method to use.
+    #[arg(long, value_enum, default_value_t = SignalingMethod::Auto)]
+    signaling_method: SignalingMethod,
 }
 
 #[tokio::main]
@@ -67,8 +71,13 @@ async fn main() -> AnyResult<()> {
     info!("Starting jetkvm_client demo...");
 
     // Create and connect the client.
-    let mut client =
-        JetKvmRpcClient::new(cli_config.host, cli_config.password, cli_config.api, false);
+    let mut client = JetKvmRpcClient::new(
+        cli_config.host,
+        cli_config.password,
+        cli_config.api,
+        false,
+        cli_config.signaling_method,
+    );
     if let Err(err) = client.connect().await {
         error!("Failed to connect to RPC server: {:?}", err);
         std::process::exit(1);
