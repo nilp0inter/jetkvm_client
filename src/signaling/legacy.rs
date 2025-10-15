@@ -37,7 +37,10 @@ pub async fn connect(
         SrtpProtectionProfile::Srtp_Aead_Aes_128_Gcm,
         SrtpProtectionProfile::Srtp_Aes128_Cm_Hmac_Sha1_80,
     ]);
-    let media_engine = MediaEngine::default();
+
+    let mut media_engine = MediaEngine::default();
+    media_engine.register_default_codecs()?;
+
     let webrtc_api = APIBuilder::new()
         .with_setting_engine(setting_engine)
         .with_media_engine(media_engine)
@@ -46,7 +49,19 @@ pub async fn connect(
     let peer_connection = Arc::new(webrtc_api.new_peer_connection(config_rtc).await?);
     debug!("PeerConnection created.");
 
-    // 3. Create a DataChannel named "rpc".
+    // 3. Add video transceiver to request video stream
+    peer_connection
+        .add_transceiver_from_kind(
+            webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
+            Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
+                direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
+                send_encodings: vec![],
+            }),
+        )
+        .await?;
+    debug!("Video transceiver added.");
+
+    // 4. Create a DataChannel named "rpc".
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
     data_channel.on_open(Box::new(move || {
         Box::pin(async move {

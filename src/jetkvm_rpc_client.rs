@@ -1,6 +1,7 @@
 use crate::auth;
 use crate::rpc_client::RpcClient;
 use crate::signaling::{legacy, websocket};
+use crate::video::VideoFrameCapture;
 use anyhow::{anyhow, Result as AnyResult};
 use reqwest::Client;
 use serde_json::Value;
@@ -30,6 +31,7 @@ pub struct JetKvmRpcClient {
     pub rpc_client: Option<RpcClient>,
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
     pub signaling_method: SignalingMethod,
+    pub video_capture: Arc<VideoFrameCapture>,
 }
 
 impl JetKvmRpcClient {
@@ -52,6 +54,7 @@ impl JetKvmRpcClient {
             rpc_client: None,
             screen_size: Arc::new(Mutex::new(None)),
             signaling_method,
+            video_capture: Arc::new(VideoFrameCapture::new()),
         }
     }
 
@@ -65,7 +68,7 @@ impl JetKvmRpcClient {
         self.http_client = Some(http_client.clone());
         self.auth_token = auth_token;
 
-        let (_peer_connection, data_channel) = match self.signaling_method {
+        let (peer_connection, data_channel) = match self.signaling_method {
             SignalingMethod::Legacy => legacy::connect(&http_client, &self.host, &self.api).await?,
             SignalingMethod::WebSocket => {
                 websocket::connect(&self.host, self.auth_token.as_deref()).await?
@@ -86,6 +89,18 @@ impl JetKvmRpcClient {
                 }
             }
         };
+
+        let video_capture = Arc::clone(&self.video_capture);
+        peer_connection.on_track(Box::new(move |track, _, _| {
+            let video_capture = Arc::clone(&video_capture);
+            Box::pin(async move {
+                debug!("Received track: kind={}", track.kind());
+                if track.kind() == webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video {
+                    debug!("Setting video track for capture");
+                    video_capture.set_track(track).await;
+                }
+            })
+        }));
 
         let rpc_client = RpcClient::new(data_channel);
         rpc_client.install_message_handler();

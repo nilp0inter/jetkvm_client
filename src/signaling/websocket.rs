@@ -77,7 +77,10 @@ pub async fn connect(
         SrtpProtectionProfile::Srtp_Aead_Aes_128_Gcm,
         SrtpProtectionProfile::Srtp_Aes128_Cm_Hmac_Sha1_80,
     ]);
-    let media_engine = MediaEngine::default();
+
+    let mut media_engine = MediaEngine::default();
+    media_engine.register_default_codecs()?;
+
     let api = APIBuilder::new()
         .with_setting_engine(setting_engine)
         .with_media_engine(media_engine)
@@ -132,7 +135,19 @@ pub async fn connect(
         return Err(anyhow!("Failed to read device-metadata from websocket."));
     }
 
-    // 3. Create DataChannel
+    // 3. Add video transceiver to request video stream
+    peer_connection
+        .add_transceiver_from_kind(
+            webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
+            Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
+                direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
+                send_encodings: vec![],
+            }),
+        )
+        .await?;
+    debug!("Video transceiver added.");
+
+    // 4. Create DataChannel
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
     data_channel.on_open(Box::new(move || {
         Box::pin(async move {
@@ -140,7 +155,7 @@ pub async fn connect(
         })
     }));
 
-    // 4. Create offer and send it
+    // 5. Create offer and send it
     let offer = peer_connection.create_offer(None).await?;
     peer_connection.set_local_description(offer.clone()).await?;
 
