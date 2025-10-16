@@ -1,5 +1,6 @@
 use crate::jetkvm_rpc_client::JetKvmRpcClient;
 use anyhow::Result as AnyResult;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::time::{sleep, Duration};
 use tracing::debug;
@@ -304,7 +305,7 @@ pub async fn send_windows_key(client: &crate::jetkvm_rpc_client::JetKvmRpcClient
 /// - `wait`: The delay (in milliseconds) after releasing the keys before proceeding to the next combination (defaults to 10 ms).
 ///
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyCombo {
     pub modifier: u8,
     pub keys: Vec<u8>,

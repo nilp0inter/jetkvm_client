@@ -1,6 +1,9 @@
+pub mod advanced;
 pub mod auth;
 pub mod cloud;
 pub mod device;
+pub mod extension;
+pub mod hardware;
 pub mod jetkvm_rpc_client;
 pub mod jiggler;
 pub mod keyboard;

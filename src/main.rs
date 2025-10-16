@@ -1,11 +1,24 @@
 use anyhow::Result as AnyResult;
 use base64::{engine::general_purpose, Engine as _};
-use clap::{CommandFactory, Parser};
+use clap::{ArgAction, CommandFactory, Parser};
+use jetkvm_client::advanced::{
+    rpc_get_dev_channel_state, rpc_get_dev_mode_state, rpc_get_local_loopback_only,
+    rpc_get_ssh_key_state, rpc_reset_config, rpc_set_dev_channel_state, rpc_set_dev_mode_state,
+    rpc_set_local_loopback_only, rpc_set_ssh_key_state,
+};
 use jetkvm_client::cloud::{
     rpc_deregister_device, rpc_get_cloud_state, rpc_get_tls_state, rpc_set_cloud_url,
     rpc_set_tls_state,
 };
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
+use jetkvm_client::extension::{
+    rpc_get_active_extension, rpc_get_serial_settings, rpc_set_active_extension,
+    rpc_set_serial_settings,
+};
+use jetkvm_client::hardware::{
+    rpc_get_backlight_settings, rpc_get_display_rotation, rpc_set_backlight_settings,
+    rpc_set_display_rotation,
+};
 use jetkvm_client::jiggler::{
     rpc_get_jiggler_config, rpc_get_jiggler_state, rpc_set_jiggler_config, rpc_set_jiggler_state,
 };
@@ -14,11 +27,12 @@ use serde_json::{json, Value};
 use jetkvm_client::keyboard::{
     rpc_get_key_down_state, rpc_get_keyboard_layout, rpc_get_keyboard_led_state,
     rpc_keyboard_report, rpc_sendtext, rpc_set_keyboard_layout, send_ctrl_a, send_ctrl_c,
-    send_ctrl_v, send_ctrl_x, send_return, send_text_with_layout, send_windows_key,
+    send_ctrl_v, send_ctrl_x, send_key_combinations, send_return, send_text_with_layout,
+    send_windows_key, KeyCombo,
 };
 use jetkvm_client::mouse::{
-    rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_middle_click, rpc_move_mouse,
-    rpc_rel_mouse_report, rpc_right_click, rpc_wheel_report,
+    rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_left_click_and_drag_to_center,
+    rpc_middle_click, rpc_move_mouse, rpc_rel_mouse_report, rpc_right_click, rpc_wheel_report,
 };
 use jetkvm_client::network::{
     rpc_get_network_settings, rpc_get_network_state, rpc_renew_dhcp_lease,
@@ -137,6 +151,9 @@ enum Commands {
     /// Sends a Windows key press.
     #[command(name = "send-windows-key")]
     SendWindowsKey,
+    /// Sends a sequence of key combinations (JSON format).
+    #[command(name = "send-key-combinations")]
+    SendKeyCombinations { combos: String },
     /// Sends an absolute mouse report with x, y coordinates and button state.
     #[command(name = "abs-mouse-report")]
     AbsMouseReport { x: i64, y: i64, buttons: u64 },
@@ -158,6 +175,9 @@ enum Commands {
     /// Simulates a double left click at the specified coordinates.
     #[command(name = "double-click")]
     DoubleClick { x: i64, y: i64 },
+    /// Clicks and drags from a position to center.
+    #[command(name = "left-click-and-drag-to-center")]
+    LeftClickAndDragToCenter { start_x: i64, start_y: i64 },
     /// Captures a screenshot as PNG (returns base64 encoded data URL).
     #[command(name = "screenshot")]
     Screenshot,
@@ -226,7 +246,10 @@ enum Commands {
     GetDcPowerState,
     /// Sets DC power state.
     #[command(name = "set-dc-power-state")]
-    SetDcPowerState { enabled: bool },
+    SetDcPowerState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
     /// Sets DC restore state.
     #[command(name = "set-dc-restore-state")]
     SetDcRestoreState { state: u64 },
@@ -247,7 +270,10 @@ enum Commands {
     GetUsbEmulationState,
     /// Sets USB emulation state.
     #[command(name = "set-usb-emulation-state")]
-    SetUsbEmulationState { enabled: bool },
+    SetUsbEmulationState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
     /// Reboots the device.
     #[command(name = "reboot")]
     Reboot {
@@ -268,7 +294,10 @@ enum Commands {
     GetAutoUpdateState,
     /// Sets the auto-update state.
     #[command(name = "set-auto-update-state")]
-    SetAutoUpdateState { enabled: bool },
+    SetAutoUpdateState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
     /// Gets the list of available timezones.
     #[command(name = "get-timezones")]
     GetTimezones,
@@ -277,7 +306,10 @@ enum Commands {
     GetJigglerState,
     /// Sets the mouse jiggler state.
     #[command(name = "set-jiggler-state")]
-    SetJigglerState { enabled: bool },
+    SetJigglerState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
     /// Gets the mouse jiggler configuration.
     #[command(name = "get-jiggler-config")]
     GetJigglerConfig,
@@ -321,6 +353,75 @@ enum Commands {
     /// Deregisters the device from the cloud.
     #[command(name = "deregister-device")]
     DeregisterDevice,
+    /// Gets the developer mode state.
+    #[command(name = "get-dev-mode-state")]
+    GetDevModeState,
+    /// Sets the developer mode state.
+    #[command(name = "set-dev-mode-state")]
+    SetDevModeState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
+    /// Gets the SSH key state.
+    #[command(name = "get-ssh-key-state")]
+    GetSshKeyState,
+    /// Sets the SSH key.
+    #[command(name = "set-ssh-key-state")]
+    SetSshKeyState { ssh_key: String },
+    /// Gets the dev channel state.
+    #[command(name = "get-dev-channel-state")]
+    GetDevChannelState,
+    /// Sets the dev channel state.
+    #[command(name = "set-dev-channel-state")]
+    SetDevChannelState {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
+    /// Gets the local loopback only setting.
+    #[command(name = "get-local-loopback-only")]
+    GetLocalLoopbackOnly,
+    /// Sets the local loopback only setting.
+    #[command(name = "set-local-loopback-only")]
+    SetLocalLoopbackOnly {
+        #[arg(action = ArgAction::Set)]
+        enabled: bool,
+    },
+    /// Resets the device configuration to factory defaults.
+    #[command(name = "reset-config")]
+    ResetConfig,
+    /// Sets the display rotation.
+    #[command(name = "set-display-rotation")]
+    SetDisplayRotation { rotation: String },
+    /// Gets the display rotation.
+    #[command(name = "get-display-rotation")]
+    GetDisplayRotation,
+    /// Sets the backlight settings.
+    #[command(name = "set-backlight-settings")]
+    SetBacklightSettings {
+        max_brightness: i32,
+        dim_after: i32,
+        off_after: i32,
+    },
+    /// Gets the backlight settings.
+    #[command(name = "get-backlight-settings")]
+    GetBacklightSettings,
+    /// Gets the active extension ID.
+    #[command(name = "get-active-extension")]
+    GetActiveExtension,
+    /// Sets the active extension.
+    #[command(name = "set-active-extension")]
+    SetActiveExtension { extension_id: String },
+    /// Gets the serial console settings.
+    #[command(name = "get-serial-settings")]
+    GetSerialSettings,
+    /// Sets the serial console settings.
+    #[command(name = "set-serial-settings")]
+    SetSerialSettings {
+        baud_rate: String,
+        data_bits: String,
+        stop_bits: String,
+        parity: String,
+    },
 }
 
 #[tokio::main]
@@ -424,6 +525,13 @@ async fn main() -> AnyResult<()> {
             Commands::SendWindowsKey => send_windows_key(&client)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::SendKeyCombinations { combos } => {
+                let combos_vec: Vec<KeyCombo> = serde_json::from_str(&combos)?;
+                send_key_combinations(&client, combos_vec)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+                    .map_err(|e| anyhow::anyhow!("{}", e))
+            }
             Commands::AbsMouseReport { x, y, buttons } => {
                 rpc_abs_mouse_report(&client, x, y, buttons)
                     .await
@@ -447,6 +555,11 @@ async fn main() -> AnyResult<()> {
             Commands::DoubleClick { x, y } => rpc_double_click(&client, x, y)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::LeftClickAndDragToCenter { start_x, start_y } => {
+                rpc_left_click_and_drag_to_center(&client, start_x, start_y)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
             Commands::Screenshot => {
                 client
                     .video_capture
@@ -598,6 +711,58 @@ async fn main() -> AnyResult<()> {
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::DeregisterDevice => rpc_deregister_device(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetDevModeState => rpc_get_dev_mode_state(&client).await,
+            Commands::SetDevModeState { enabled } => rpc_set_dev_mode_state(&client, enabled)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetSshKeyState => rpc_get_ssh_key_state(&client).await,
+            Commands::SetSshKeyState { ssh_key } => rpc_set_ssh_key_state(&client, &ssh_key)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetDevChannelState => rpc_get_dev_channel_state(&client).await,
+            Commands::SetDevChannelState { enabled } => {
+                rpc_set_dev_channel_state(&client, enabled)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetLocalLoopbackOnly => rpc_get_local_loopback_only(&client).await,
+            Commands::SetLocalLoopbackOnly { enabled } => {
+                rpc_set_local_loopback_only(&client, enabled)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::ResetConfig => rpc_reset_config(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SetDisplayRotation { rotation } => {
+                rpc_set_display_rotation(&client, &rotation)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetDisplayRotation => rpc_get_display_rotation(&client).await,
+            Commands::SetBacklightSettings {
+                max_brightness,
+                dim_after,
+                off_after,
+            } => rpc_set_backlight_settings(&client, max_brightness, dim_after, off_after)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetBacklightSettings => rpc_get_backlight_settings(&client).await,
+            Commands::GetActiveExtension => rpc_get_active_extension(&client).await,
+            Commands::SetActiveExtension { extension_id } => {
+                rpc_set_active_extension(&client, &extension_id)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetSerialSettings => rpc_get_serial_settings(&client).await,
+            Commands::SetSerialSettings {
+                baud_rate,
+                data_bits,
+                stop_bits,
+                parity,
+            } => rpc_set_serial_settings(&client, &baud_rate, &data_bits, &stop_bits, &parity)
                 .await
                 .map(|_| json!({ "status": "ok" })),
         };
