@@ -72,10 +72,10 @@ pub mod layouts {
     use once_cell::sync::Lazy;
 
     pub static EN_US: Lazy<KeyboardLayout> =
-        Lazy::new(|| crate::keyboard_layouts::en_us::create_layout());
+        Lazy::new(crate::keyboard_layouts::en_us::create_layout);
 
     pub static ES_ES: Lazy<KeyboardLayout> =
-        Lazy::new(|| crate::keyboard_layouts::es_es::create_layout());
+        Lazy::new(crate::keyboard_layouts::es_es::create_layout);
 
     pub fn get_layout(iso_code: &str) -> Option<&'static KeyboardLayout> {
         match iso_code {

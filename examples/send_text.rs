@@ -4,7 +4,6 @@ use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
 use jetkvm_client::keyboard::*;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
-use tracing_subscriber;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
