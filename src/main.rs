@@ -2,6 +2,9 @@ use anyhow::Result as AnyResult;
 use base64::{engine::general_purpose, Engine as _};
 use clap::{CommandFactory, Parser};
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
+use jetkvm_client::jiggler::{
+    rpc_get_jiggler_config, rpc_get_jiggler_state, rpc_set_jiggler_config, rpc_set_jiggler_state,
+};
 use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
 use serde_json::{json, Value};
 use jetkvm_client::keyboard::{
@@ -33,6 +36,12 @@ use jetkvm_client::system::{
 use jetkvm_client::usb::{
     rpc_get_usb_config, rpc_get_usb_devices, rpc_get_usb_emulation_state, rpc_set_usb_config,
     rpc_set_usb_devices, rpc_set_usb_emulation_state,
+};
+use jetkvm_client::video::{
+    rpc_get_stream_quality_factor, rpc_get_video_log_status, rpc_get_video_state,
+};
+use jetkvm_client::wol::{
+    rpc_get_wake_on_lan_devices, rpc_send_wol_magic_packet, rpc_set_wake_on_lan_devices,
 };
 use tracing::info;
 use tracing_subscriber::prelude::*;
@@ -259,6 +268,36 @@ enum Commands {
     /// Gets the list of available timezones.
     #[command(name = "get-timezones")]
     GetTimezones,
+    /// Gets the mouse jiggler state.
+    #[command(name = "get-jiggler-state")]
+    GetJigglerState,
+    /// Sets the mouse jiggler state.
+    #[command(name = "set-jiggler-state")]
+    SetJigglerState { enabled: bool },
+    /// Gets the mouse jiggler configuration.
+    #[command(name = "get-jiggler-config")]
+    GetJigglerConfig,
+    /// Sets the mouse jiggler configuration.
+    #[command(name = "set-jiggler-config")]
+    SetJigglerConfig { config: String },
+    /// Gets the video stream state.
+    #[command(name = "get-video-state")]
+    GetVideoState,
+    /// Gets the stream quality factor.
+    #[command(name = "get-stream-quality-factor")]
+    GetStreamQualityFactor,
+    /// Gets the video logging status.
+    #[command(name = "get-video-log-status")]
+    GetVideoLogStatus,
+    /// Gets Wake-on-LAN devices.
+    #[command(name = "get-wake-on-lan-devices")]
+    GetWakeOnLanDevices,
+    /// Sets Wake-on-LAN devices.
+    #[command(name = "set-wake-on-lan-devices")]
+    SetWakeOnLanDevices { params: String },
+    /// Sends a Wake-on-LAN magic packet.
+    #[command(name = "send-wol-magic-packet")]
+    SendWolMagicPacket { mac_address: String },
 }
 
 #[tokio::main]
@@ -497,6 +536,32 @@ async fn main() -> AnyResult<()> {
                     .map(|_| json!({ "status": "ok" }))
             }
             Commands::GetTimezones => rpc_get_timezones(&client).await,
+            Commands::GetJigglerState => rpc_get_jiggler_state(&client).await,
+            Commands::SetJigglerState { enabled } => rpc_set_jiggler_state(&client, enabled)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetJigglerConfig => rpc_get_jiggler_config(&client).await,
+            Commands::SetJigglerConfig { config } => {
+                let config_json: Value = serde_json::from_str(&config)?;
+                rpc_set_jiggler_config(&client, config_json)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetVideoState => rpc_get_video_state(&client).await,
+            Commands::GetStreamQualityFactor => rpc_get_stream_quality_factor(&client).await,
+            Commands::GetVideoLogStatus => rpc_get_video_log_status(&client).await,
+            Commands::GetWakeOnLanDevices => rpc_get_wake_on_lan_devices(&client).await,
+            Commands::SetWakeOnLanDevices { params } => {
+                let params_json: Value = serde_json::from_str(&params)?;
+                rpc_set_wake_on_lan_devices(&client, params_json)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::SendWolMagicPacket { mac_address } => {
+                rpc_send_wol_magic_packet(&client, mac_address)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
         };
 
         match result {

@@ -183,3 +183,18 @@ impl Default for VideoFrameCapture {
         Self::new()
     }
 }
+
+use crate::jetkvm_rpc_client::JetKvmRpcClient;
+use serde_json::{json, Value};
+
+pub async fn rpc_get_video_state(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getVideoState", json!({})).await
+}
+
+pub async fn rpc_get_stream_quality_factor(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getStreamQualityFactor", json!({})).await
+}
+
+pub async fn rpc_get_video_log_status(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getVideoLogStatus", json!({})).await
+}

@@ -1,6 +1,7 @@
 pub mod auth;
 pub mod device;
 pub mod jetkvm_rpc_client;
+pub mod jiggler;
 pub mod keyboard;
 pub mod keyboard_layout;
 pub mod keyboard_layouts;
@@ -15,5 +16,6 @@ pub mod system;
 pub mod text_to_macro;
 pub mod usb;
 pub mod video;
+pub mod wol;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;
