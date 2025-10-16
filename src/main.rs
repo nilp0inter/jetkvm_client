@@ -1,6 +1,8 @@
 use anyhow::Result as AnyResult;
 use base64::{engine::general_purpose, Engine as _};
 use clap::{ArgAction, CommandFactory, Parser};
+use std::fs::File;
+use std::io::Write;
 use jetkvm_client::advanced::{
     rpc_get_dev_channel_state, rpc_get_dev_mode_state, rpc_get_local_loopback_only,
     rpc_get_ssh_key_state, rpc_reset_config, rpc_set_dev_channel_state, rpc_set_dev_mode_state,
@@ -180,7 +182,10 @@ enum Commands {
     LeftClickAndDragToCenter { start_x: i64, start_y: i64 },
     /// Captures a screenshot as PNG (returns base64 encoded data URL).
     #[command(name = "screenshot")]
-    Screenshot,
+    Screenshot {
+        #[arg(long)]
+        output: Option<String>,
+    },
     /// Waits for the specified number of milliseconds.
     #[command(name = "wait")]
     Wait { milliseconds: u64 },
@@ -560,20 +565,31 @@ async fn main() -> AnyResult<()> {
                     .await
                     .map(|_| json!({ "status": "ok" }))
             }
-            Commands::Screenshot => {
+            Commands::Screenshot { output } => {
                 client
                     .video_capture
                     .capture_screenshot_png()
                     .await
-                    .map(|png_data| {
+                    .and_then(|png_data| {
                         let base64_data = general_purpose::STANDARD.encode(&png_data);
                         let data_url = format!("data:image/png;base64,{}", base64_data);
-                        json!({
+                        
+                        let mut result = json!({
                             "status": "ok",
                             "format": "png",
                             "size": png_data.len(),
                             "data": data_url
-                        })
+                        });
+                        
+                        if let Some(output_path) = output {
+                            let mut file = File::create(&output_path)
+                                .map_err(|e| anyhow::anyhow!("Failed to create output file: {}", e))?;
+                            file.write_all(&png_data)
+                                .map_err(|e| anyhow::anyhow!("Failed to write to output file: {}", e))?;
+                            result["saved_to"] = json!(output_path);
+                        }
+                        
+                        Ok(result)
                     })
             }
             Commands::Wait { milliseconds } => {

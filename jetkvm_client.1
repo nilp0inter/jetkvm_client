@@ -585,13 +585,22 @@ $ jetkvm_client -H 192.168.1.100 -P password set-jiggler-config '{"interval": 50
 .SS VIDEO COMMANDS
 
 .TP
-.B screenshot
+.B screenshot [\-\-output OUTPUT_PATH]
 Capture a screenshot from the remote device (returns base64-encoded PNG data URL).
 .br
-Example:
+Arguments:
+.RS
+.IP "\-\-output OUTPUT_PATH"
+Optional path to save the PNG image to disk
+.RE
+Examples:
 .br
 .RS
 $ jetkvm_client -H 192.168.1.100 -P password screenshot > screenshot.b64
+.br
+$ jetkvm_client -H 192.168.1.100 -P password screenshot --output screen.png
+.br
+$ jetkvm_client -H 192.168.1.100 -P password screenshot --output /tmp/screenshot_$(date +%s).png
 .RE
 
 .TP
@@ -1345,6 +1354,19 @@ jetkvm_client -H 192.168.1.100 -P mypassword ping
 jetkvm_client -H 192.168.1.100 -P mypassword sendtext "user@domain.com"
 .fi
 
+.SS Capture Screenshot
+.nf
+# Capture screenshot as base64 output
+jetkvm_client -H 192.168.1.100 -P mypassword screenshot
+
+# Save screenshot to file
+jetkvm_client -H 192.168.1.100 -P mypassword screenshot --output screenshot.png
+
+# Capture with timestamp
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  screenshot --output "capture_$(date +%Y%m%d_%H%M%S).png"
+.fi
+
 .SS Chain Multiple Commands
 .nf
 jetkvm_client -H 192.168.1.100 -P mypassword \\
@@ -1392,7 +1414,7 @@ jetkvm_client -H 192.168.1.100 -P mypassword \\
   wait 2000 \\
   set-atx-power-action "on" \\
   wait 10000 \\
-  screenshot
+  screenshot --output boot_screen.png
 .fi
 
 .SS Wake-on-LAN Magic Packet
