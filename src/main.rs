@@ -26,7 +26,10 @@ use jetkvm_client::storage::{
     rpc_list_storage_files, rpc_mount_with_http, rpc_mount_with_storage,
     rpc_start_storage_file_upload, rpc_unmount_image,
 };
-use jetkvm_client::system::{rpc_get_edid, rpc_set_edid};
+use jetkvm_client::system::{
+    rpc_get_auto_update_state, rpc_get_edid, rpc_get_local_version, rpc_get_timezones,
+    rpc_get_update_status, rpc_reboot, rpc_set_auto_update_state, rpc_set_edid, rpc_try_update,
+};
 use jetkvm_client::usb::{
     rpc_get_usb_config, rpc_get_usb_devices, rpc_get_usb_emulation_state, rpc_set_usb_config,
     rpc_set_usb_devices, rpc_set_usb_emulation_state,
@@ -232,6 +235,30 @@ enum Commands {
     /// Sets USB emulation state.
     #[command(name = "set-usb-emulation-state")]
     SetUsbEmulationState { enabled: bool },
+    /// Reboots the device.
+    #[command(name = "reboot")]
+    Reboot {
+        #[arg(long, default_value = "false")]
+        force: bool,
+    },
+    /// Gets the local firmware version.
+    #[command(name = "get-local-version")]
+    GetLocalVersion,
+    /// Gets the firmware update status.
+    #[command(name = "get-update-status")]
+    GetUpdateStatus,
+    /// Attempts to update the firmware.
+    #[command(name = "try-update")]
+    TryUpdate,
+    /// Gets the auto-update state.
+    #[command(name = "get-auto-update-state")]
+    GetAutoUpdateState,
+    /// Sets the auto-update state.
+    #[command(name = "set-auto-update-state")]
+    SetAutoUpdateState { enabled: bool },
+    /// Gets the list of available timezones.
+    #[command(name = "get-timezones")]
+    GetTimezones,
 }
 
 #[tokio::main]
@@ -455,6 +482,21 @@ async fn main() -> AnyResult<()> {
                     .await
                     .map(|_| json!({ "status": "ok" }))
             }
+            Commands::Reboot { force } => rpc_reboot(&client, force)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetLocalVersion => rpc_get_local_version(&client).await,
+            Commands::GetUpdateStatus => rpc_get_update_status(&client).await,
+            Commands::TryUpdate => rpc_try_update(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetAutoUpdateState => rpc_get_auto_update_state(&client).await,
+            Commands::SetAutoUpdateState { enabled } => {
+                rpc_set_auto_update_state(&client, enabled)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetTimezones => rpc_get_timezones(&client).await,
         };
 
         match result {

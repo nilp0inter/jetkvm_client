@@ -23,3 +23,33 @@ pub async fn rpc_set_edid(client: &JetKvmRpcClient, edid: String) -> AnyResult<V
             .to_string(),
     ))
 }
+
+pub async fn rpc_reboot(client: &JetKvmRpcClient, force: bool) -> AnyResult<Value> {
+    let params = json!({ "force": force });
+    client.send_rpc("reboot", params).await
+}
+
+pub async fn rpc_get_local_version(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getLocalVersion", json!({})).await
+}
+
+pub async fn rpc_get_update_status(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getUpdateStatus", json!({})).await
+}
+
+pub async fn rpc_try_update(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("tryUpdate", json!({})).await
+}
+
+pub async fn rpc_get_auto_update_state(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getAutoUpdateState", json!({})).await
+}
+
+pub async fn rpc_set_auto_update_state(client: &JetKvmRpcClient, enabled: bool) -> AnyResult<Value> {
+    let params = json!({ "enabled": enabled });
+    client.send_rpc("setAutoUpdateState", params).await
+}
+
+pub async fn rpc_get_timezones(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getTimezones", json!({})).await
+}
