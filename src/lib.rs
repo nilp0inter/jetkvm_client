@@ -6,10 +6,14 @@ pub mod keyboard_layout;
 pub mod keyboard_layouts;
 pub mod keyboard_mappings;
 pub mod mouse;
+pub mod network;
+pub mod power;
 pub mod rpc_client;
 pub mod signaling;
+pub mod storage;
 pub mod system;
 pub mod text_to_macro;
+pub mod usb;
 pub mod video;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;

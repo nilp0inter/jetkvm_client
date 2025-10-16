@@ -316,6 +316,23 @@ pub struct KeyCombo {
     pub clear_keys: Option<bool>,
 }
 
+pub async fn rpc_get_keyboard_layout(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getKeyboardLayout", json!({})).await
+}
+
+pub async fn rpc_set_keyboard_layout(client: &JetKvmRpcClient, layout: String) -> AnyResult<Value> {
+    let params = json!({ "layout": layout });
+    client.send_rpc("setKeyboardLayout", params).await
+}
+
+pub async fn rpc_get_keyboard_led_state(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getKeyboardLedState", json!({})).await
+}
+
+pub async fn rpc_get_key_down_state(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getKeyDownState", json!({})).await
+}
+
 use std::collections::HashSet;
 use tokio::time;
 pub async fn send_key_combinations(

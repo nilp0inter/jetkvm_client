@@ -3,16 +3,34 @@ use base64::{engine::general_purpose, Engine as _};
 use clap::{CommandFactory, Parser};
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::jetkvm_rpc_client::{JetKvmRpcClient, SignalingMethod};
+use serde_json::{json, Value};
 use jetkvm_client::keyboard::{
-    rpc_keyboard_report, rpc_sendtext, send_ctrl_a, send_ctrl_c, send_ctrl_v, send_ctrl_x,
-    send_return, send_text_with_layout, send_windows_key,
+    rpc_get_key_down_state, rpc_get_keyboard_layout, rpc_get_keyboard_led_state,
+    rpc_keyboard_report, rpc_sendtext, rpc_set_keyboard_layout, send_ctrl_a, send_ctrl_c,
+    send_ctrl_v, send_ctrl_x, send_return, send_text_with_layout, send_windows_key,
 };
 use jetkvm_client::mouse::{
     rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_middle_click, rpc_move_mouse,
-    rpc_right_click, rpc_wheel_report,
+    rpc_rel_mouse_report, rpc_right_click, rpc_wheel_report,
+};
+use jetkvm_client::network::{
+    rpc_get_network_settings, rpc_get_network_state, rpc_renew_dhcp_lease,
+    rpc_set_network_settings,
+};
+use jetkvm_client::power::{
+    rpc_get_atx_state, rpc_get_dc_power_state, rpc_set_atx_power_action, rpc_set_dc_power_state,
+    rpc_set_dc_restore_state,
+};
+use jetkvm_client::storage::{
+    rpc_delete_storage_file, rpc_get_storage_space, rpc_get_virtual_media_state,
+    rpc_list_storage_files, rpc_mount_with_http, rpc_mount_with_storage,
+    rpc_start_storage_file_upload, rpc_unmount_image,
 };
 use jetkvm_client::system::{rpc_get_edid, rpc_set_edid};
-use serde_json::json;
+use jetkvm_client::usb::{
+    rpc_get_usb_config, rpc_get_usb_devices, rpc_get_usb_emulation_state, rpc_set_usb_config,
+    rpc_set_usb_devices, rpc_set_usb_emulation_state,
+};
 use tracing::info;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::{fmt, registry, EnvFilter};
@@ -130,6 +148,90 @@ enum Commands {
     /// Waits for the specified number of milliseconds.
     #[command(name = "wait")]
     Wait { milliseconds: u64 },
+    /// Gets the current keyboard layout.
+    #[command(name = "get-keyboard-layout")]
+    GetKeyboardLayout,
+    /// Sets the keyboard layout.
+    #[command(name = "set-keyboard-layout")]
+    SetKeyboardLayout { layout: String },
+    /// Gets the keyboard LED state (Caps/Num Lock).
+    #[command(name = "get-keyboard-led-state")]
+    GetKeyboardLedState,
+    /// Gets the currently pressed keys.
+    #[command(name = "get-key-down-state")]
+    GetKeyDownState,
+    /// Sends a relative mouse report with dx, dy and button state.
+    #[command(name = "rel-mouse-report")]
+    RelMouseReport { dx: i64, dy: i64, buttons: u64 },
+    /// Gets the virtual media state.
+    #[command(name = "get-virtual-media-state")]
+    GetVirtualMediaState,
+    /// Mounts virtual media from HTTP URL.
+    #[command(name = "mount-with-http")]
+    MountWithHttp { url: String, mode: String },
+    /// Mounts virtual media from storage.
+    #[command(name = "mount-with-storage")]
+    MountWithStorage { filename: String, mode: String },
+    /// Unmounts virtual media.
+    #[command(name = "unmount-image")]
+    UnmountImage,
+    /// Lists files in storage.
+    #[command(name = "list-storage-files")]
+    ListStorageFiles,
+    /// Gets available storage space.
+    #[command(name = "get-storage-space")]
+    GetStorageSpace,
+    /// Deletes a file from storage.
+    #[command(name = "delete-storage-file")]
+    DeleteStorageFile { filename: String },
+    /// Starts a file upload to storage.
+    #[command(name = "start-storage-file-upload")]
+    StartStorageFileUpload { filename: String, size: u64 },
+    /// Gets network settings.
+    #[command(name = "get-network-settings")]
+    GetNetworkSettings,
+    /// Sets network settings.
+    #[command(name = "set-network-settings")]
+    SetNetworkSettings { settings: String },
+    /// Gets network state.
+    #[command(name = "get-network-state")]
+    GetNetworkState,
+    /// Renews DHCP lease.
+    #[command(name = "renew-dhcp-lease")]
+    RenewDhcpLease,
+    /// Gets ATX power state.
+    #[command(name = "get-atx-state")]
+    GetAtxState,
+    /// Sets ATX power action (power on/off/reset).
+    #[command(name = "set-atx-power-action")]
+    SetAtxPowerAction { action: String },
+    /// Gets DC power state.
+    #[command(name = "get-dc-power-state")]
+    GetDcPowerState,
+    /// Sets DC power state.
+    #[command(name = "set-dc-power-state")]
+    SetDcPowerState { enabled: bool },
+    /// Sets DC restore state.
+    #[command(name = "set-dc-restore-state")]
+    SetDcRestoreState { state: u64 },
+    /// Gets USB configuration.
+    #[command(name = "get-usb-config")]
+    GetUsbConfig,
+    /// Sets USB configuration.
+    #[command(name = "set-usb-config")]
+    SetUsbConfig { config: String },
+    /// Gets USB devices.
+    #[command(name = "get-usb-devices")]
+    GetUsbDevices,
+    /// Sets USB devices.
+    #[command(name = "set-usb-devices")]
+    SetUsbDevices { devices: String },
+    /// Gets USB emulation state.
+    #[command(name = "get-usb-emulation-state")]
+    GetUsbEmulationState,
+    /// Sets USB emulation state.
+    #[command(name = "set-usb-emulation-state")]
+    SetUsbEmulationState { enabled: bool },
 }
 
 #[tokio::main]
@@ -275,6 +377,83 @@ async fn main() -> AnyResult<()> {
             Commands::Wait { milliseconds } => {
                 tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
                 Ok(json!({ "status": "ok" }))
+            }
+            Commands::GetKeyboardLayout => rpc_get_keyboard_layout(&client).await,
+            Commands::SetKeyboardLayout { layout } => rpc_set_keyboard_layout(&client, layout)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetKeyboardLedState => rpc_get_keyboard_led_state(&client).await,
+            Commands::GetKeyDownState => rpc_get_key_down_state(&client).await,
+            Commands::RelMouseReport { dx, dy, buttons } => {
+                rpc_rel_mouse_report(&client, dx, dy, buttons)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetVirtualMediaState => rpc_get_virtual_media_state(&client).await,
+            Commands::MountWithHttp { url, mode } => rpc_mount_with_http(&client, url, mode)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::MountWithStorage { filename, mode } => {
+                rpc_mount_with_storage(&client, filename, mode)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::UnmountImage => rpc_unmount_image(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::ListStorageFiles => rpc_list_storage_files(&client).await,
+            Commands::GetStorageSpace => rpc_get_storage_space(&client).await,
+            Commands::DeleteStorageFile { filename } => {
+                rpc_delete_storage_file(&client, filename)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::StartStorageFileUpload { filename, size } => {
+                rpc_start_storage_file_upload(&client, filename, size)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetNetworkSettings => rpc_get_network_settings(&client).await,
+            Commands::SetNetworkSettings { settings } => {
+                let settings_json: Value = serde_json::from_str(&settings)?;
+                rpc_set_network_settings(&client, settings_json)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetNetworkState => rpc_get_network_state(&client).await,
+            Commands::RenewDhcpLease => rpc_renew_dhcp_lease(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetAtxState => rpc_get_atx_state(&client).await,
+            Commands::SetAtxPowerAction { action } => rpc_set_atx_power_action(&client, action)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetDcPowerState => rpc_get_dc_power_state(&client).await,
+            Commands::SetDcPowerState { enabled } => rpc_set_dc_power_state(&client, enabled)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SetDcRestoreState { state } => rpc_set_dc_restore_state(&client, state)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetUsbConfig => rpc_get_usb_config(&client).await,
+            Commands::SetUsbConfig { config } => {
+                let config_json: Value = serde_json::from_str(&config)?;
+                rpc_set_usb_config(&client, config_json)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetUsbDevices => rpc_get_usb_devices(&client).await,
+            Commands::SetUsbDevices { devices } => {
+                let devices_json: Value = serde_json::from_str(&devices)?;
+                rpc_set_usb_devices(&client, devices_json)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
+            }
+            Commands::GetUsbEmulationState => rpc_get_usb_emulation_state(&client).await,
+            Commands::SetUsbEmulationState { enabled } => {
+                rpc_set_usb_emulation_state(&client, enabled)
+                    .await
+                    .map(|_| json!({ "status": "ok" }))
             }
         };
 

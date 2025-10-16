@@ -18,6 +18,21 @@ pub async fn rpc_abs_mouse_report(
     client.send_rpc("absMouseReport", params).await
 }
 
+/// Sends a relative mouse report with dx, dy and button state.
+pub async fn rpc_rel_mouse_report(
+    client: &JetKvmRpcClient,
+    dx: i64,
+    dy: i64,
+    buttons: u64,
+) -> AnyResult<Value> {
+    let params = json!({
+        "dx": dx,
+        "dy": dy,
+        "buttons": buttons,
+    });
+    client.send_rpc("relMouseReport", params).await
+}
+
 /// Sends a wheel report with the given wheelY value.
 pub async fn rpc_wheel_report(client: &JetKvmRpcClient, wheel_y: i64) -> AnyResult<Value> {
     let params = json!({ "wheelY": wheel_y });
