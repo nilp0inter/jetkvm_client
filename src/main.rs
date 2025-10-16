@@ -1,6 +1,10 @@
 use anyhow::Result as AnyResult;
 use base64::{engine::general_purpose, Engine as _};
 use clap::{CommandFactory, Parser};
+use jetkvm_client::cloud::{
+    rpc_deregister_device, rpc_get_cloud_state, rpc_get_tls_state, rpc_set_cloud_url,
+    rpc_set_tls_state,
+};
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::jiggler::{
     rpc_get_jiggler_config, rpc_get_jiggler_state, rpc_set_jiggler_config, rpc_set_jiggler_state,
@@ -298,6 +302,25 @@ enum Commands {
     /// Sends a Wake-on-LAN magic packet.
     #[command(name = "send-wol-magic-packet")]
     SendWolMagicPacket { mac_address: String },
+    /// Gets the cloud connection state.
+    #[command(name = "get-cloud-state")]
+    GetCloudState,
+    /// Sets the cloud URL.
+    #[command(name = "set-cloud-url")]
+    SetCloudUrl { api_url: String, app_url: String },
+    /// Gets the TLS state.
+    #[command(name = "get-tls-state")]
+    GetTlsState,
+    /// Sets the TLS state.
+    #[command(name = "set-tls-state")]
+    SetTlsState {
+        mode: String,
+        certificate: String,
+        private_key: String,
+    },
+    /// Deregisters the device from the cloud.
+    #[command(name = "deregister-device")]
+    DeregisterDevice,
 }
 
 #[tokio::main]
@@ -562,6 +585,21 @@ async fn main() -> AnyResult<()> {
                     .await
                     .map(|_| json!({ "status": "ok" }))
             }
+            Commands::GetCloudState => rpc_get_cloud_state(&client).await,
+            Commands::SetCloudUrl { api_url, app_url } => rpc_set_cloud_url(&client, &api_url, &app_url)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::GetTlsState => rpc_get_tls_state(&client).await,
+            Commands::SetTlsState {
+                mode,
+                certificate,
+                private_key,
+            } => rpc_set_tls_state(&client, &mode, &certificate, &private_key)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::DeregisterDevice => rpc_deregister_device(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
         };
 
         match result {

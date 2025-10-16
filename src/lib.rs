@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod cloud;
 pub mod device;
 pub mod jetkvm_rpc_client;
 pub mod jiggler;
