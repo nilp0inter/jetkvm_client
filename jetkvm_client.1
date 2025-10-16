@@ -1,0 +1,1492 @@
+.TH JETKVM_CLIENT 1 "October 2025" "jetkvm_client 0.0.1" "User Commands"
+.SH NAME
+jetkvm_client \- Remote control client for JetKVM over WebRTC
+
+.SH SYNOPSIS
+.B jetkvm_client
+.I [OPTIONS]
+.B --host
+.I HOST
+.B --password
+.I PASSWORD
+.I COMMANDS...
+
+.SH DESCRIPTION
+.B jetkvm_client
+is a command-line client for controlling a JetKVM device remotely over WebRTC.
+It allows you to send keyboard inputs, mouse movements, manage storage, configure
+network settings, control power, and perform various remote management tasks.
+
+Multiple commands can be chained together in a single invocation, and they will be
+executed sequentially against the same WebRTC connection.
+
+.SH GLOBAL OPTIONS
+
+.TP
+.B \-H, --host
+.I HOST
+The host address or IP of the JetKVM device to connect to. This is required.
+.br
+Examples: \fB192.168.1.100\fR, \fBjetkvmdevice.local\fR
+
+.TP
+.B \-p, --port
+.I PORT
+The port number to connect to. Default: \fB80\fR
+.br
+Use port 443 for HTTPS connections.
+
+.TP
+.B \-a, --api
+.I API
+The API endpoint for WebRTC signaling. Default: \fB/webrtc/session\fR
+.br
+Most users should not need to change this.
+
+.TP
+.B \-P, --password
+.I PASSWORD
+The authentication password for the JetKVM device. This is required.
+
+.TP
+.B \-d, --debug
+Enable verbose debug logging. Useful for troubleshooting connection issues.
+
+.TP
+.B \-C, --ca-cert-path
+.I PATH
+Path to the CA certificate file for HTTPS connections. Default: \fBcert.pem\fR
+
+.TP
+.B --signaling-method
+.I METHOD
+WebRTC signaling method to use. Options: \fBauto\fR, \fBlegacy\fR, \fBweb-socket\fR
+Default: \fBauto\fR (automatically detects the best method)
+
+.TP
+.B \-h, --help
+Print the help message and exit.
+
+.TP
+.B \-V, --version
+Print the version information and exit.
+
+.SH COMMANDS
+
+Commands are executed sequentially and their output is returned as JSON. Multiple
+commands can be chained together in a single invocation.
+
+.SS SYSTEM COMMANDS
+
+.TP
+.B ping
+Test connectivity to the JetKVM device.
+.br
+Returns: Basic connectivity confirmation
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password ping
+.RE
+
+.TP
+.B get-device-id
+Retrieve the unique device identifier.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-device-id
+.RE
+
+.TP
+.B reboot [\-\-force=BOOL]
+Reboot the JetKVM device.
+.br
+Options:
+.RS
+.IP \-\-force
+Force immediate reboot (default: false)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password reboot
+.br
+$ jetkvm_client -H 192.168.1.100 -P password reboot --force true
+.RE
+
+.TP
+.B get-local-version
+Get the current firmware version of the device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-local-version
+.RE
+
+.TP
+.B get-update-status
+Check if there are available firmware updates.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-update-status
+.RE
+
+.TP
+.B try-update
+Attempt to update the device firmware to the latest available version.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password try-update
+.RE
+
+.TP
+.B get-auto-update-state
+Check if automatic firmware updates are enabled.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-auto-update-state
+.RE
+
+.TP
+.B set-auto-update-state ENABLED
+Enable or disable automatic firmware updates.
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-auto-update-state true
+.RE
+
+.TP
+.B get-timezones
+Retrieve a list of all available timezones that can be configured on the device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-timezones
+.RE
+
+.SS KEYBOARD COMMANDS
+
+.TP
+.B keyboard-report \-\-modifier MODIFIER [\-\-keys KEY1 KEY2 ...]
+Send a raw HID keyboard report with specified modifier and keys.
+.br
+Arguments:
+.RS
+.IP "\-\-modifier MODIFIER"
+Modifier byte (bit flags for Ctrl, Shift, Alt, etc.)
+.IP "\-\-keys KEY1 [KEY2 ...]"
+HID key codes to send (space-separated)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password keyboard-report --modifier 0 --keys 65
+.br
+$ jetkvm_client -H 192.168.1.100 -P password keyboard-report --modifier 1 --keys 6 7 8
+.RE
+
+.TP
+.B sendtext TEXT
+Send text as ASCII keyboard events. Supports only US ASCII characters.
+.br
+Arguments:
+.RS
+.IP TEXT
+The text string to send
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password sendtext "Hello World"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password sendtext "user@example.com"
+.RE
+
+.TP
+.B send-text-with-layout TEXT [\-\-layout LAYOUT] [\-\-delay DELAY]
+Send text using a specific keyboard layout, supporting accents and special characters.
+.br
+Arguments:
+.RS
+.IP TEXT
+The text string to send
+.IP "\-\-layout LAYOUT"
+Keyboard layout identifier (default: en-US). Examples: es-ES, fr-FR, de-DE
+.IP "\-\-delay DELAY"
+Delay in milliseconds between key presses (default: 20)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-text-with-layout "Héllo"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password send-text-with-layout "España" --layout es-ES --delay 50
+.RE
+
+.TP
+.B send-return
+Send a Return (Enter) key press.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-return
+.RE
+
+.TP
+.B send-ctrl-c
+Send a Ctrl+C keyboard event (interrupt signal).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-c
+.RE
+
+.TP
+.B send-ctrl-v
+Send a Ctrl+V keyboard event (paste).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-v
+.RE
+
+.TP
+.B send-ctrl-x
+Send a Ctrl+X keyboard event (cut).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-x
+.RE
+
+.TP
+.B send-ctrl-a
+Send a Ctrl+A keyboard event (select all).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-a
+.RE
+
+.TP
+.B send-windows-key
+Send a Windows/Super key press.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-windows-key
+.RE
+
+.TP
+.B send-key-combinations COMBOS_JSON
+Send a sequence of complex key combinations. Takes a JSON array of key combo objects.
+.br
+Arguments:
+.RS
+.IP COMBOS_JSON
+JSON array of key combinations with modifiers and keys
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-key-combinations '[
+  {
+    "modifier": 2,
+    "keys": [6],
+    "hold_modifiers": false,
+    "hold_keys": false,
+    "wait": 100
+  }
+]'
+.RE
+
+.TP
+.B get-keyboard-layout
+Get the currently configured keyboard layout.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-keyboard-layout
+.RE
+
+.TP
+.B set-keyboard-layout LAYOUT
+Set the keyboard layout for the remote device.
+.br
+Arguments:
+.RS
+.IP LAYOUT
+Layout identifier (e.g., en-US, es-ES, fr-FR, de-DE)
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-keyboard-layout es-ES
+.RE
+
+.TP
+.B get-keyboard-led-state
+Get the state of keyboard LEDs (Caps Lock, Num Lock, Scroll Lock).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-keyboard-led-state
+.RE
+
+.TP
+.B get-key-down-state
+Get which keys are currently being held down on the remote device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-key-down-state
+.RE
+
+.SS MOUSE COMMANDS
+
+.TP
+.B abs-mouse-report X Y BUTTONS
+Send an absolute mouse position report (used for precise positioning).
+.br
+Arguments:
+.RS
+.IP X
+X coordinate (0-based, typically 0-1920)
+.IP Y
+Y coordinate (0-based, typically 0-1080)
+.IP BUTTONS
+Button state bitmask (1=left, 2=right, 4=middle, etc.)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password abs-mouse-report 960 540 0
+.br
+$ jetkvm_client -H 192.168.1.100 -P password abs-mouse-report 100 200 1
+.RE
+
+.TP
+.B rel-mouse-report DX DY BUTTONS
+Send a relative mouse movement report.
+.br
+Arguments:
+.RS
+.IP DX
+Relative X movement (positive right, negative left)
+.IP DY
+Relative Y movement (positive down, negative up)
+.IP BUTTONS
+Button state bitmask
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password rel-mouse-report 10 -5 0
+.RE
+
+.TP
+.B wheel-report WHEEL_Y
+Send a mouse wheel scroll event.
+.br
+Arguments:
+.RS
+.IP WHEEL_Y
+Wheel delta (positive for scroll up, negative for scroll down)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password wheel-report 3
+.br
+$ jetkvm_client -H 192.168.1.100 -P password wheel-report -2
+.RE
+
+.TP
+.B move-mouse X Y
+Move the mouse to specified absolute coordinates.
+.br
+Arguments:
+.RS
+.IP X
+X coordinate
+.IP Y
+Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password move-mouse 960 540
+.RE
+
+.TP
+.B left-click X Y
+Perform a left mouse click at the specified coordinates.
+.br
+Arguments:
+.RS
+.IP X
+X coordinate
+.IP Y
+Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password left-click 100 100
+.RE
+
+.TP
+.B right-click X Y
+Perform a right mouse click at the specified coordinates.
+.br
+Arguments:
+.RS
+.IP X
+X coordinate
+.IP Y
+Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password right-click 500 300
+.RE
+
+.TP
+.B middle-click X Y
+Perform a middle mouse click at the specified coordinates.
+.br
+Arguments:
+.RS
+.IP X
+X coordinate
+.IP Y
+Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password middle-click 640 360
+.RE
+
+.TP
+.B double-click X Y
+Perform a double left mouse click at the specified coordinates.
+.br
+Arguments:
+.RS
+.IP X
+X coordinate
+.IP Y
+Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password double-click 800 600
+.RE
+
+.TP
+.B left-click-and-drag-to-center START_X START_Y
+Perform a left click and drag operation from the starting position to the center of the screen.
+.br
+Arguments:
+.RS
+.IP START_X
+Starting X coordinate
+.IP START_Y
+Starting Y coordinate
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password left-click-and-drag-to-center 100 100
+.RE
+
+.SS MOUSE JIGGLER COMMANDS
+
+.TP
+.B get-jiggler-state
+Get the current state of the mouse jiggler (enabled/disabled).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-jiggler-state
+.RE
+
+.TP
+.B set-jiggler-state ENABLED
+Enable or disable the mouse jiggler (prevents screen sleep).
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-jiggler-state true
+.RE
+
+.TP
+.B get-jiggler-config
+Get the current mouse jiggler configuration parameters.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-jiggler-config
+.RE
+
+.TP
+.B set-jiggler-config CONFIG_JSON
+Configure the mouse jiggler behavior with a JSON configuration object.
+.br
+Arguments:
+.RS
+.IP CONFIG_JSON
+JSON object with jiggler configuration
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-jiggler-config '{"interval": 5000, "distance": 5}'
+.RE
+
+.SS VIDEO COMMANDS
+
+.TP
+.B screenshot
+Capture a screenshot from the remote device (returns base64-encoded PNG data URL).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password screenshot > screenshot.b64
+.RE
+
+.TP
+.B get-video-state
+Get the current state of the video stream (enabled/disabled).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-video-state
+.RE
+
+.TP
+.B get-stream-quality-factor
+Get the current video quality factor (compression level).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-stream-quality-factor
+.RE
+
+.TP
+.B get-video-log-status
+Get the status of video logging on the device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-video-log-status
+.RE
+
+.TP
+.B get-edid
+Get the EDID (Extended Display Identification Data) of the connected display.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-edid
+.RE
+
+.TP
+.B set-edid EDID_DATA
+Set custom EDID data for the virtual display.
+.br
+Arguments:
+.RS
+.IP EDID_DATA
+EDID binary data (typically hex-encoded)
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-edid "00ffd3..."
+.RE
+
+.SS STORAGE/VIRTUAL MEDIA COMMANDS
+
+.TP
+.B get-virtual-media-state
+Get the current state of mounted virtual media (ISO images, etc.).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-virtual-media-state
+.RE
+
+.TP
+.B mount-with-http URL MODE
+Mount a virtual media image from an HTTP/HTTPS URL.
+.br
+Arguments:
+.RS
+.IP URL
+Complete URL to the ISO/image file (e.g., http://example.com/image.iso)
+.IP MODE
+Mount mode (typically "rw" for read-write or "ro" for read-only)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password mount-with-http "http://example.com/windows.iso" "ro"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password mount-with-http "https://cdn.example.com/ubuntu.iso" "ro"
+.RE
+
+.TP
+.B mount-with-storage FILENAME MODE
+Mount a virtual media image from local device storage.
+.br
+Arguments:
+.RS
+.IP FILENAME
+Name of the file in storage
+.IP MODE
+Mount mode (typically "rw" for read-write or "ro" for read-only)
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password mount-with-storage "debian.iso" "ro"
+.RE
+
+.TP
+.B unmount-image
+Unmount the currently mounted virtual media.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password unmount-image
+.RE
+
+.TP
+.B list-storage-files
+List all files currently stored on the device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password list-storage-files
+.RE
+
+.TP
+.B get-storage-space
+Get information about available storage space on the device.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-storage-space
+.RE
+
+.TP
+.B delete-storage-file FILENAME
+Delete a file from the device storage.
+.br
+Arguments:
+.RS
+.IP FILENAME
+Name of the file to delete
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password delete-storage-file "old-image.iso"
+.RE
+
+.TP
+.B start-storage-file-upload FILENAME SIZE
+Initiate a file upload to device storage.
+.br
+Arguments:
+.RS
+.IP FILENAME
+Name for the uploaded file
+.IP SIZE
+File size in bytes
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password start-storage-file-upload "new-image.iso" 4700000000
+.RE
+
+.SS NETWORK COMMANDS
+
+.TP
+.B get-network-settings
+Get the current network configuration (IP, DNS, gateway, etc.).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-network-settings
+.RE
+
+.TP
+.B set-network-settings SETTINGS_JSON
+Configure network settings with a JSON configuration object.
+.br
+Arguments:
+.RS
+.IP SETTINGS_JSON
+JSON object with network settings (DHCP, IP, netmask, gateway, DNS, etc.)
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-network-settings '{
+  "dhcp": false,
+  "ip": "192.168.1.50",
+  "netmask": "255.255.255.0",
+  "gateway": "192.168.1.1",
+  "dns1": "8.8.8.8",
+  "dns2": "8.8.4.4"
+}'
+.RE
+
+.TP
+.B get-network-state
+Get the current network state (connection status, IP address, etc.).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-network-state
+.RE
+
+.TP
+.B renew-dhcp-lease
+Renew the DHCP lease to obtain a new IP address.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password renew-dhcp-lease
+.RE
+
+.SS WAKE-ON-LAN COMMANDS
+
+.TP
+.B get-wake-on-lan-devices
+Get the list of configured Wake-on-LAN devices.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-wake-on-lan-devices
+.RE
+
+.TP
+.B set-wake-on-lan-devices PARAMS_JSON
+Configure Wake-on-LAN devices with a JSON configuration.
+.br
+Arguments:
+.RS
+.IP PARAMS_JSON
+JSON object with WOL device configurations
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-wake-on-lan-devices '{
+  "devices": [
+    {
+      "name": "Server1",
+      "mac": "00:11:22:33:44:55",
+      "broadcast": "192.168.1.255"
+    }
+  ]
+}'
+.RE
+
+.TP
+.B send-wol-magic-packet MAC_ADDRESS
+Send a Wake-on-LAN magic packet to wake up a device with the given MAC address.
+.br
+Arguments:
+.RS
+.IP MAC_ADDRESS
+MAC address of the target device (format: XX:XX:XX:XX:XX:XX)
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-wol-magic-packet "00:11:22:33:44:55"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password send-wol-magic-packet "AA:BB:CC:DD:EE:FF"
+.RE
+
+.SS POWER CONTROL COMMANDS
+
+.TP
+.B get-atx-state
+Get the current ATX power state (on/off/reset).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-atx-state
+.RE
+
+.TP
+.B set-atx-power-action ACTION
+Perform an ATX power control action on the managed computer.
+.br
+Arguments:
+.RS
+.IP ACTION
+Power action: "on", "off", "reset", "pulse"
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-atx-power-action "on"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password set-atx-power-action "off"
+.br
+$ jetkvm_client -H 192.168.1.100 -P password set-atx-power-action "reset"
+.RE
+
+.TP
+.B get-dc-power-state
+Get the current DC power state.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-dc-power-state
+.RE
+
+.TP
+.B set-dc-power-state ENABLED
+Enable or disable DC power.
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-dc-power-state true
+.RE
+
+.TP
+.B set-dc-restore-state STATE
+Set the DC power restoration behavior after power loss.
+.br
+Arguments:
+.RS
+.IP STATE
+Restoration state configuration
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-dc-restore-state 1
+.RE
+
+.SS USB COMMANDS
+
+.TP
+.B get-usb-config
+Get the current USB configuration.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-usb-config
+.RE
+
+.TP
+.B set-usb-config CONFIG_JSON
+Configure USB settings with a JSON configuration object.
+.br
+Arguments:
+.RS
+.IP CONFIG_JSON
+JSON object with USB configuration
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-usb-config '{"enabled": true}'
+.RE
+
+.TP
+.B get-usb-devices
+Get the list of USB devices available.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-usb-devices
+.RE
+
+.TP
+.B set-usb-devices DEVICES_JSON
+Configure which USB devices are available/redirected.
+.br
+Arguments:
+.RS
+.IP DEVICES_JSON
+JSON array of device configurations
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-usb-devices '[
+  {
+    "id": "1234:5678",
+    "enabled": true
+  }
+]'
+.RE
+
+.TP
+.B get-usb-emulation-state
+Get the USB emulation state.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-usb-emulation-state
+.RE
+
+.TP
+.B set-usb-emulation-state ENABLED
+Enable or disable USB emulation mode.
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-usb-emulation-state true
+.RE
+
+.SS CLOUD & ACCESS COMMANDS
+
+.TP
+.B get-cloud-state
+Get the cloud connection state and configuration.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-cloud-state
+.RE
+
+.TP
+.B set-cloud-url API_URL APP_URL
+Configure cloud API and app URLs.
+.br
+Arguments:
+.RS
+.IP API_URL
+Cloud API base URL
+.IP APP_URL
+Cloud application URL
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-cloud-url "https://api.cloud.example.com" "https://app.cloud.example.com"
+.RE
+
+.TP
+.B get-tls-state
+Get the TLS/SSL certificate configuration state.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-tls-state
+.RE
+
+.TP
+.B set-tls-state MODE CERTIFICATE PRIVATE_KEY
+Configure TLS/SSL with certificate and private key.
+.br
+Arguments:
+.RS
+.IP MODE
+TLS mode (e.g., "enabled", "disabled", "auto")
+.IP CERTIFICATE
+PEM-encoded certificate data
+.IP PRIVATE_KEY
+PEM-encoded private key data
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-tls-state "enabled" \
+  "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----" \
+  "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+.RE
+
+.TP
+.B deregister-device
+Deregister the device from the cloud management system.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password deregister-device
+.RE
+
+.SS ADVANCED SETTINGS COMMANDS
+
+.TP
+.B get-dev-mode-state
+Get the developer mode state (enabled/disabled).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-dev-mode-state
+.RE
+
+.TP
+.B set-dev-mode-state ENABLED
+Enable or disable developer mode for advanced features.
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-dev-mode-state true
+.RE
+
+.TP
+.B get-ssh-key-state
+Get the current SSH key configuration.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-ssh-key-state
+.RE
+
+.TP
+.B set-ssh-key-state SSH_KEY
+Configure SSH key for secure shell access.
+.br
+Arguments:
+.RS
+.IP SSH_KEY
+SSH public key (typically starts with "ssh-rsa", "ssh-ed25519", etc.)
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-ssh-key-state "ssh-rsa AAAAB3NzaC1yc2E..."
+.RE
+
+.TP
+.B get-dev-channel-state
+Get the development channel state (whether using dev/beta updates).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-dev-channel-state
+.RE
+
+.TP
+.B set-dev-channel-state ENABLED
+Enable or disable development channel updates.
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-dev-channel-state true
+.RE
+
+.TP
+.B get-local-loopback-only
+Get the loopback-only setting (restricts access to localhost only).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-local-loopback-only
+.RE
+
+.TP
+.B set-local-loopback-only ENABLED
+Enable or disable loopback-only mode (localhost-only access).
+.br
+Arguments:
+.RS
+.IP ENABLED
+Boolean value: true or false
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-local-loopback-only true
+.RE
+
+.TP
+.B reset-config
+Reset all device configuration to factory defaults.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password reset-config
+.RE
+
+.SS HARDWARE SETTINGS COMMANDS
+
+.TP
+.B get-display-rotation
+Get the current display rotation setting.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-display-rotation
+.RE
+
+.TP
+.B set-display-rotation ROTATION
+Set the display rotation.
+.br
+Arguments:
+.RS
+.IP ROTATION
+Rotation setting: "0", "90", "180", "270"
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-display-rotation "90"
+.RE
+
+.TP
+.B get-backlight-settings
+Get the backlight configuration (brightness, dim timeout, off timeout).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-backlight-settings
+.RE
+
+.TP
+.B set-backlight-settings MAX_BRIGHTNESS DIM_AFTER OFF_AFTER
+Configure backlight settings.
+.br
+Arguments:
+.RS
+.IP MAX_BRIGHTNESS
+Maximum brightness level (typically 0-100)
+.IP DIM_AFTER
+Seconds until screen dims when idle
+.IP OFF_AFTER
+Seconds until screen turns off when idle
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-backlight-settings 80 300 600
+.RE
+
+.SS EXTENSION COMMANDS
+
+.TP
+.B get-active-extension
+Get the ID of the currently active extension.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-active-extension
+.RE
+
+.TP
+.B set-active-extension EXTENSION_ID
+Activate a specific extension by its ID.
+.br
+Arguments:
+.RS
+.IP EXTENSION_ID
+Extension identifier
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-active-extension "serial-console"
+.RE
+
+.TP
+.B get-serial-settings
+Get the serial console settings (baud rate, data bits, stop bits, parity).
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password get-serial-settings
+.RE
+
+.TP
+.B set-serial-settings BAUD_RATE DATA_BITS STOP_BITS PARITY
+Configure serial console settings.
+.br
+Arguments:
+.RS
+.IP BAUD_RATE
+Baud rate (e.g., "9600", "115200")
+.IP DATA_BITS
+Data bits (typically "8")
+.IP STOP_BITS
+Stop bits (typically "1" or "2")
+.IP PARITY
+Parity setting: "none", "even", "odd"
+.RE
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password set-serial-settings "115200" "8" "1" "none"
+.RE
+
+.SS UTILITY COMMANDS
+
+.TP
+.B wait MILLISECONDS
+Pause execution for the specified number of milliseconds.
+.br
+Arguments:
+.RS
+.IP MILLISECONDS
+Duration to wait in milliseconds
+.RE
+Examples:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password wait 1000
+.br
+$ jetkvm_client -H 192.168.1.100 -P password wait 500
+.RE
+
+.SH EXAMPLES
+
+.SS Basic Connectivity Test
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword ping
+.fi
+
+.SS Send Text to Remote System
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword sendtext "user@domain.com"
+.fi
+
+.SS Chain Multiple Commands
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  sendtext "password" \\
+  send-return \\
+  wait 2000 \\
+  sendtext "ls -la" \\
+  send-return
+.fi
+
+.SS Click and Navigate
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  move-mouse 100 100 \\
+  left-click 100 100 \\
+  wait 500 \\
+  double-click 200 200
+.fi
+
+.SS Mount and Configure Storage
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  mount-with-http "https://example.com/ubuntu.iso" "ro" \\
+  wait 5000 \\
+  get-virtual-media-state
+.fi
+
+.SS Configure Network
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  set-network-settings '{
+    "dhcp": false,
+    "ip": "192.168.1.50",
+    "netmask": "255.255.255.0",
+    "gateway": "192.168.1.1"
+  }' \\
+  wait 2000 \\
+  get-network-state
+.fi
+
+.SS Power Control Sequence
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  set-atx-power-action "off" \\
+  wait 2000 \\
+  set-atx-power-action "on" \\
+  wait 10000 \\
+  screenshot
+.fi
+
+.SS Wake-on-LAN Magic Packet
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  send-wol-magic-packet "00:11:22:33:44:55"
+.fi
+
+.SS Complete Automation Workflow
+.nf
+jetkvm_client -H 192.168.1.100 -P mypassword \\
+  get-device-id \\
+  get-local-version \\
+  screenshot \\
+  get-network-settings \\
+  get-virtual-media-state \\
+  list-storage-files \\
+  get-jiggler-state
+.fi
+
+.SH OUTPUT FORMAT
+
+All command output is returned as JSON format. Each command produces a JSON object containing:
+
+.nf
+{
+  "command": "command-name",
+  "params": [...],
+  "result": {...}
+}
+.fi
+
+If an error occurs:
+
+.nf
+{
+  "command": "command-name",
+  "params": [...],
+  "error": "error message"
+}
+.fi
+
+.SH ENVIRONMENT
+
+No special environment variables are required. However, you can set up shell aliases for
+frequently used hosts:
+
+.nf
+alias jetkvmlab='jetkvm_client -H 192.168.1.100 -P mypassword'
+jetkvmlab ping
+jetkvmlab get-device-id
+.fi
+
+.SH TROUBLESHOOTING
+
+.TP
+.B Connection Refused
+Check that the host address and port are correct, and that the JetKVM device is
+powered on and accessible on the network.
+
+.TP
+.B Authentication Failed
+Verify that the password is correct for the target JetKVM device.
+
+.TP
+.B Signaling Protocol Error
+Try specifying a different signaling method with \-\-signaling-method:
+.br
+\fBjetkvm_client --signaling-method legacy ...\fR
+.br
+\fBjetkvm_client --signaling-method web-socket ...\fR
+
+.TP
+.B Enable Debug Logging
+Use the \-d flag to see detailed debugging information:
+.br
+\fBjetkvm_client -d -H 192.168.1.100 -P password command\fR
+
+.TP
+.B Timeout Issues
+Some operations may take longer on slower networks. Chain wait commands between operations:
+.br
+\fBjetkvm_client -H 192.168.1.100 -P password command1 wait 5000 command2\fR
+
+.SH SEE ALSO
+For more information about JetKVM, visit: https://github.com/nilp0inter/jetkvm
+
+.SH AUTHOR
+Written for the JetKVM project.
+
+.SH LICENSE
+Licensed under the same license as JetKVM.
+
+.SH HISTORY
+.TP
+v0.0.1 (October 2025)
+Initial release with full feature parity with Web UI.
