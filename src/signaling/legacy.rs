@@ -30,11 +30,7 @@ pub async fn connect(
     http_client: &Client,
     host: &str,
     api: &str,
-) -> AnyResult<(
-    Arc<RTCPeerConnection>,
-    Arc<RTCDataChannel>,
-    Arc<RTCDataChannel>,
-)> {
+) -> AnyResult<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>)> {
     // 2. Initialize WebRTC.
     let mut setting_engine = webrtc::api::setting_engine::SettingEngine::default();
     setting_engine.set_srtp_protection_profiles(vec![
@@ -70,13 +66,6 @@ pub async fn connect(
     data_channel.on_open(Box::new(move || {
         Box::pin(async move {
             debug!("✅ DataChannel 'rpc' is now open!");
-        })
-    }));
-
-    let serial_channel = peer_connection.create_data_channel("serial", None).await?;
-    serial_channel.on_open(Box::new(move || {
-        Box::pin(async move {
-            debug!("✅ DataChannel 'serial' is now open!");
         })
     }));
 
@@ -142,5 +131,5 @@ pub async fn connect(
     peer_connection.set_remote_description(remote_desc).await?;
     debug!("Remote SDP Answer set.");
 
-    Ok((peer_connection, data_channel, serial_channel))
+    Ok((peer_connection, data_channel))
 }
