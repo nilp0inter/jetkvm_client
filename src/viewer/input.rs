@@ -6,6 +6,12 @@ use arrayvec::ArrayVec;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta};
 use winit::keyboard::KeyCode;
 
+/// JetKVM's USB-HID absolute pointer descriptor uses Logical Maximum 0x7FFF
+/// for both X and Y. The firmware does not scale this to the EDID resolution;
+/// the host's HID driver maps 0..32767 → full screen. We therefore always send
+/// coordinates in this range, regardless of the remote frame resolution.
+pub const ABS_MOUSE_MAX: i64 = 0x7FFF;
+
 #[derive(Debug, Clone)]
 pub enum InputEvent {
     Keyboard { modifier: u8, keys: Vec<u8> },
@@ -93,11 +99,8 @@ impl MouseState {
         widget_y: f64,
         widget_w: f64,
         widget_h: f64,
-        remote_w: u32,
-        remote_h: u32,
     ) -> InputEvent {
-        let (rx, ry) =
-            map_to_remote(widget_x, widget_y, widget_w, widget_h, remote_w, remote_h);
+        let (rx, ry) = map_to_abs(widget_x, widget_y, widget_w, widget_h);
         self.last_x = rx;
         self.last_y = ry;
         InputEvent::AbsMouse {
@@ -144,20 +147,16 @@ impl MouseState {
     }
 }
 
-fn map_to_remote(
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
-    remote_w: u32,
-    remote_h: u32,
-) -> (i64, i64) {
+fn map_to_abs(x: f64, y: f64, w: f64, h: f64) -> (i64, i64) {
     if w <= 0.0 || h <= 0.0 {
         return (0, 0);
     }
-    let rx = ((x.max(0.0).min(w) / w) * remote_w as f64) as i64;
-    let ry = ((y.max(0.0).min(h) / h) * remote_h as f64) as i64;
-    (rx.clamp(0, remote_w as i64 - 1), ry.clamp(0, remote_h as i64 - 1))
+    let nx = (x.max(0.0).min(w) / w) * ABS_MOUSE_MAX as f64;
+    let ny = (y.max(0.0).min(h) / h) * ABS_MOUSE_MAX as f64;
+    (
+        (nx.round() as i64).clamp(0, ABS_MOUSE_MAX),
+        (ny.round() as i64).clamp(0, ABS_MOUSE_MAX),
+    )
 }
 
 fn modifier_mask(code: KeyCode) -> Option<u8> {

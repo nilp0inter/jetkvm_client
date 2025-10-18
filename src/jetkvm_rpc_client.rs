@@ -12,6 +12,7 @@ use tokio::time::Duration;
 use tracing::{debug, info, warn};
 
 use webrtc::data_channel::RTCDataChannel;
+use webrtc::peer_connection::peer_connection_state::RTCPeerConnectionState;
 use webrtc::track::track_remote::TrackRemote;
 
 #[derive(Clone, Debug, Default, ValueEnum)]
@@ -41,6 +42,8 @@ pub struct JetKvmRpcClient {
     pub video_capture: Arc<VideoFrameCapture>,
     video_track_tx: watch::Sender<Option<Arc<TrackRemote>>>,
     video_track_rx: watch::Receiver<Option<Arc<TrackRemote>>>,
+    peer_state_tx: watch::Sender<RTCPeerConnectionState>,
+    peer_state_rx: watch::Receiver<RTCPeerConnectionState>,
 }
 
 impl JetKvmRpcClient {
@@ -54,6 +57,7 @@ impl JetKvmRpcClient {
     ) -> Self {
         debug!("Initializing JetKvmRpcClient with host: {}", host);
         let (video_track_tx, video_track_rx) = watch::channel(None);
+        let (peer_state_tx, peer_state_rx) = watch::channel(RTCPeerConnectionState::New);
         Self {
             host,
             password,
@@ -69,6 +73,8 @@ impl JetKvmRpcClient {
             video_capture: Arc::new(VideoFrameCapture::new()),
             video_track_tx,
             video_track_rx,
+            peer_state_tx,
+            peer_state_rx,
         }
     }
 
@@ -78,6 +84,14 @@ impl JetKvmRpcClient {
     /// streaming GStreamer pipeline.
     pub fn video_track_watcher(&self) -> watch::Receiver<Option<Arc<TrackRemote>>> {
         self.video_track_rx.clone()
+    }
+
+    /// Returns a `watch::Receiver` that observes the WebRTC peer-connection
+    /// state. Consumers can `await` `changed()` and inspect the latest value
+    /// via `borrow()` to detect transitions to `Disconnected`, `Failed`, or
+    /// `Closed` — used by the viewer's reconnect loop to detect drops.
+    pub fn peer_state_watcher(&self) -> watch::Receiver<RTCPeerConnectionState> {
+        self.peer_state_rx.clone()
     }
 
     /// Connects the client to the JetKVM service.
@@ -124,6 +138,15 @@ impl JetKvmRpcClient {
                     video_capture.set_track(track.clone()).await;
                     let _ = video_track_tx.send(Some(track));
                 }
+            })
+        }));
+
+        let peer_state_tx = self.peer_state_tx.clone();
+        peer_connection.on_peer_connection_state_change(Box::new(move |state| {
+            let peer_state_tx = peer_state_tx.clone();
+            Box::pin(async move {
+                debug!("Peer connection state changed: {:?}", state);
+                let _ = peer_state_tx.send(state);
             })
         }));
 

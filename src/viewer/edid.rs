@@ -78,6 +78,45 @@ pub static MONITOR_BASE_EDID: Lazy<[u8; 128]> = Lazy::new(|| {
     e[54 + 13] = (324 & 0xFF) as u8;
     e[54 + 14] = ((((518 >> 8) & 0x0F) << 4) | ((324 >> 8) & 0x0F)) as u8;
 
+    // Colour-characterisation block (bytes 23..=34) — overwrite the
+    // firmware-shipped values with exact sRGB / IEC 61966-2-1.
+    //
+    // macOS (and other ICC-aware hosts) parses these to either select a
+    // factory ICC profile or synthesise a corrective one. If they don't
+    // describe a standard space the host applies a corrective transform and
+    // the visible result is a warm cast. Asserting sRGB-default makes the
+    // host pass the framebuffer through unmodified.
+    //
+    //   byte 23: display gamma. Encoded as (gamma * 100) - 100. 2.2 → 120.
+    e[23] = 120;
+    //   byte 24: feature support. Preserve DPMS / digital-display-type bits,
+    //   set bit 2 ("sRGB Standard is the default colour space").
+    e[24] |= 0b0000_0100;
+    //   bytes 25..=34: chromaticity. Each x/y is a 10-bit unsigned value =
+    //   round(coord * 1024); the high 8 bits go into bytes 27..=34, the low
+    //   2 bits get packed into bytes 25/26.
+    //
+    //     sRGB primaries (BT.709) + D65 white:
+    //       Rx 0.640 → 655   Ry 0.330 → 338
+    //       Gx 0.300 → 307   Gy 0.600 → 614
+    //       Bx 0.150 → 154   By 0.060 →  61
+    //       Wx 0.3127→ 320   Wy 0.3290→ 337
+    //
+    //   byte 25: Rx[1:0]Ry[1:0]Gx[1:0]Gy[1:0]
+    //          = 11 10 11 10 = 0xEE
+    e[25] = 0xEE;
+    //   byte 26: Bx[1:0]By[1:0]Wx[1:0]Wy[1:0]
+    //          = 10 01 00 01 = 0x91
+    e[26] = 0x91;
+    e[27] = 0xA3; // Rx >> 2
+    e[28] = 0x54; // Ry >> 2
+    e[29] = 0x4C; // Gx >> 2
+    e[30] = 0x99; // Gy >> 2
+    e[31] = 0x26; // Bx >> 2
+    e[32] = 0x0F; // By >> 2
+    e[33] = 0x50; // Wx >> 2
+    e[34] = 0x54; // Wy >> 2
+
     // DTD#3 (offset 90..108) is a Display Product Name descriptor.
     // bytes 90..95 are the tag preamble (00 00 00 FC 00) and stay intact.
     // bytes 95..108 carry up to 13 ASCII chars terminated by 0x0A and
@@ -712,6 +751,50 @@ mod tests {
     fn monitor_base_checksum_is_valid() {
         let sum: u32 = MONITOR_BASE_EDID.iter().map(|&b| b as u32).sum();
         assert_eq!(sum % 256, 0);
+    }
+
+    #[test]
+    fn monitor_base_advertises_srgb_default_colorspace() {
+        // Byte 24 bit 2 = "sRGB Standard is the default colour space" —
+        // macOS uses this to skip auto-deriving a corrective ICC profile
+        // from the chromaticity coordinates.
+        assert_eq!(
+            MONITOR_BASE_EDID[24] & 0b0000_0100,
+            0b0000_0100,
+            "byte 24 bit 2 (sRGB default) must be set; got 0x{:02X}",
+            MONITOR_BASE_EDID[24]
+        );
+    }
+
+    #[test]
+    fn monitor_base_chromaticity_decodes_to_srgb_primaries() {
+        // Decode each 10-bit (low 2 bits packed in byte 25/26, high 8 bits in
+        // bytes 27..=34) chromaticity value and check it is within 0.001 of
+        // the sRGB / BT.709 / D65 specification.
+        let rx = decode_chroma(MONITOR_BASE_EDID[27], (MONITOR_BASE_EDID[25] >> 6) & 0x3);
+        let ry = decode_chroma(MONITOR_BASE_EDID[28], (MONITOR_BASE_EDID[25] >> 4) & 0x3);
+        let gx = decode_chroma(MONITOR_BASE_EDID[29], (MONITOR_BASE_EDID[25] >> 2) & 0x3);
+        let gy = decode_chroma(MONITOR_BASE_EDID[30], MONITOR_BASE_EDID[25] & 0x3);
+        let bx = decode_chroma(MONITOR_BASE_EDID[31], (MONITOR_BASE_EDID[26] >> 6) & 0x3);
+        let by = decode_chroma(MONITOR_BASE_EDID[32], (MONITOR_BASE_EDID[26] >> 4) & 0x3);
+        let wx = decode_chroma(MONITOR_BASE_EDID[33], (MONITOR_BASE_EDID[26] >> 2) & 0x3);
+        let wy = decode_chroma(MONITOR_BASE_EDID[34], MONITOR_BASE_EDID[26] & 0x3);
+        // Allow ~1 LSB rounding error (1/1024 ≈ 0.001).
+        assert!((rx - 0.640).abs() < 0.002, "Rx {rx}");
+        assert!((ry - 0.330).abs() < 0.002, "Ry {ry}");
+        assert!((gx - 0.300).abs() < 0.002, "Gx {gx}");
+        assert!((gy - 0.600).abs() < 0.002, "Gy {gy}");
+        assert!((bx - 0.150).abs() < 0.002, "Bx {bx}");
+        assert!((by - 0.060).abs() < 0.002, "By {by}");
+        assert!((wx - 0.3127).abs() < 0.002, "Wx {wx}");
+        assert!((wy - 0.3290).abs() < 0.002, "Wy {wy}");
+        // Gamma byte: encoded as (gamma * 100) - 100. 2.2 → 120.
+        assert_eq!(MONITOR_BASE_EDID[23], 120, "gamma byte must be 2.2 = 120");
+    }
+
+    fn decode_chroma(high8: u8, low2: u8) -> f32 {
+        let raw = ((high8 as u32) << 2) | (low2 as u32);
+        raw as f32 / 1024.0
     }
 
     #[test]

@@ -1,17 +1,31 @@
-//! wgpu renderer: uploads NV12 planes to textures and draws a full-screen
-//! triangle that does YUV→RGB (BT.709 limited range) in the fragment shader.
+//! wgpu renderer: uploads NV12 planes, decodes YUV→RGB with the stream's
+//! signalled colorimetry, and applies AMD RCAS sharpening (FSR 1.0) in a
+//! single fragment pass.
 
 use std::sync::Arc;
 
 use anyhow::{anyhow, Result as AnyResult};
+use tracing::info;
 use winit::window::Window;
 
-use super::pipeline::Frame;
+use super::pipeline::{ColorMatrix, ColorRange, Frame};
 
 const SHADER_SRC: &str = r#"
+struct Uniforms {
+    kr: f32,
+    kb: f32,
+    y_off: f32,
+    y_scale: f32,
+    c_off: f32,
+    c_scale: f32,
+    rcas_sharpness: f32,
+    _pad: f32,
+};
+
 @group(0) @binding(0) var y_tex: texture_2d<f32>;
 @group(0) @binding(1) var uv_tex: texture_2d<f32>;
 @group(0) @binding(2) var samp: sampler;
+@group(0) @binding(3) var<uniform> u: Uniforms;
 
 struct VsOut {
     @builtin(position) pos: vec4<f32>,
@@ -36,20 +50,101 @@ fn vs_main(@builtin(vertex_index) idx: u32) -> VsOut {
     return o;
 }
 
+fn decode_yuv(coord: vec2<f32>) -> vec3<f32> {
+    let y_raw  = textureSample(y_tex,  samp, coord).r;
+    let uv_raw = textureSample(uv_tex, samp, coord).rg;
+    let y  = (y_raw    - u.y_off) * u.y_scale;
+    let cb = (uv_raw.r - u.c_off) * u.c_scale;
+    let cr = (uv_raw.g - u.c_off) * u.c_scale;
+    let kg = 1.0 - u.kr - u.kb;
+    let r = y + 2.0 * (1.0 - u.kr) * cr;
+    let b = y + 2.0 * (1.0 - u.kb) * cb;
+    let g = (y - u.kr * r - u.kb * b) / kg;
+    return clamp(vec3<f32>(r, g, b), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+// AMD FSR 1.0 RCAS — Robust Contrast Adaptive Sharpening, FP32 reference path.
+// Public-domain reference: https://github.com/GPUOpen-Effects/FidelityFX-FSR
+// Operates on the decoded RGB at +/- 1 source-pixel offsets. Correct when the
+// source frame resolution matches the swapchain (the common case here, thanks
+// to EDID negotiation); degrades gracefully when it doesn't.
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    let y_raw  = textureSample(y_tex,  samp, in.uv).r;
-    let uv_raw = textureSample(uv_tex, samp, in.uv).rg;
-    // BT.709 limited range → full range
-    let y  = (y_raw  - 16.0/255.0) * (255.0/219.0);
-    let cb = (uv_raw.r - 128.0/255.0) * (255.0/224.0);
-    let cr = (uv_raw.g - 128.0/255.0) * (255.0/224.0);
-    let r = y + 1.5748 * cr;
-    let g = y - 0.1873 * cb - 0.4681 * cr;
-    let b = y + 1.8556 * cb;
-    return vec4<f32>(clamp(vec3<f32>(r, g, b), vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
+    let e = decode_yuv(in.uv);
+
+    if (u.rcas_sharpness <= 0.0) {
+        return vec4<f32>(e, 1.0);
+    }
+
+    let dim  = vec2<f32>(textureDimensions(y_tex));
+    let step = vec2<f32>(1.0 / dim.x, 1.0 / dim.y);
+
+    let b = decode_yuv(in.uv + vec2<f32>(0.0,    -step.y));
+    let d = decode_yuv(in.uv + vec2<f32>(-step.x, 0.0));
+    let f = decode_yuv(in.uv + vec2<f32>( step.x, 0.0));
+    let h = decode_yuv(in.uv + vec2<f32>(0.0,     step.y));
+
+    let mn4 = min(min(b, d), min(f, h));
+    let mx4 = max(max(b, d), max(f, h));
+
+    // Per-channel lobe weight: how much can we add the cross-pattern energy to
+    // the centre without pushing any channel outside [0,1]?
+    let hit_min = mn4 / max(4.0 * mx4, vec3<f32>(1.0e-5));
+    let hit_max = (vec3<f32>(1.0) - mx4) /
+                  min(4.0 * mn4 - vec3<f32>(4.0), vec3<f32>(-1.0e-5));
+    let lobe_rgb = max(-hit_min, hit_max);
+    let lobe_max = max(lobe_rgb.r, max(lobe_rgb.g, lobe_rgb.b));
+    let lobe = max(-0.1875, min(lobe_max, 0.0)) * u.rcas_sharpness;
+
+    let c = ((b + d + f + h) * lobe + e) / (4.0 * lobe + 1.0);
+    return vec4<f32>(clamp(c, vec3<f32>(0.0), vec3<f32>(1.0)), 1.0);
 }
 "#;
+
+/// Per-frame shader uniforms. Mirrors the WGSL `Uniforms` struct.
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+struct ShaderUniforms {
+    kr: f32,
+    kb: f32,
+    y_off: f32,
+    y_scale: f32,
+    c_off: f32,
+    c_scale: f32,
+    rcas_sharpness: f32,
+    _pad: f32,
+}
+
+impl ShaderUniforms {
+    fn from_frame(frame: &Frame, sharpness: f32) -> Self {
+        let (kr, kb) = frame.matrix.coefficients();
+        let (y_off, y_scale, c_scale) = match frame.range {
+            // Limited range: Y in [16,235], CbCr in [16,240]. Expand to [0,1].
+            ColorRange::Limited => (16.0 / 255.0, 255.0 / 219.0, 255.0 / 224.0),
+            // Full range: already [0,1]; chroma is still centred at 128.
+            ColorRange::Full => (0.0, 1.0, 1.0),
+        };
+        // AMD RCAS convention: con.x = exp2(-sharpness_user). User input 0
+        // (no sharpening) is mapped to 0.0 here so the shader's early-out
+        // disables the sharpener entirely; values >0 enable it with a
+        // strength of exp2(-sharpness).
+        let rcas_sharpness = if sharpness <= 0.0 {
+            0.0
+        } else {
+            (-sharpness).exp2()
+        };
+        Self {
+            kr,
+            kb,
+            y_off,
+            y_scale,
+            c_off: 128.0 / 255.0,
+            c_scale,
+            rcas_sharpness,
+            _pad: 0.0,
+        }
+    }
+}
 
 pub struct Renderer {
     surface: wgpu::Surface<'static>,
@@ -59,15 +154,18 @@ pub struct Renderer {
     pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
+    uniform_buffer: wgpu::Buffer,
+    sharpness: f32,
     y_texture: Option<wgpu::Texture>,
     uv_texture: Option<wgpu::Texture>,
     bind_group: Option<wgpu::BindGroup>,
     frame_dims: Option<(u32, u32)>,
+    last_colorimetry: Option<(ColorMatrix, ColorRange)>,
     window: Arc<Window>,
 }
 
 impl Renderer {
-    pub async fn new(window: Arc<Window>) -> AnyResult<Self> {
+    pub async fn new(window: Arc<Window>, sharpness: f32) -> AnyResult<Self> {
         let size = window.inner_size();
         // Use only primary backends (Vulkan on Linux, Metal on macOS, DX12 on
         // Windows). The GLES fallback in wgpu-hal panics during EGL init on
@@ -105,11 +203,15 @@ impl Renderer {
             .map_err(|e| anyhow!("request_device: {e}"))?;
 
         let surface_caps = surface.get_capabilities(&adapter);
+        // Prefer a non-sRGB UNORM format: the BT.709 YUV→RGB conversion in the
+        // fragment shader already produces gamma-encoded display-space values.
+        // Writing those to an sRGB target would apply an extra linear→sRGB
+        // transform on top, lifting blacks and washing out the image.
         let surface_format = surface_caps
             .formats
             .iter()
             .copied()
-            .find(|f| f.is_srgb())
+            .find(|f| !f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
 
         let config = wgpu::SurfaceConfiguration {
@@ -158,7 +260,24 @@ impl Renderer {
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
+        });
+
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("viewer uniforms"),
+            size: std::mem::size_of::<ShaderUniforms>() as u64,
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
@@ -212,12 +331,19 @@ impl Renderer {
             pipeline,
             bind_group_layout,
             sampler,
+            uniform_buffer,
+            sharpness,
             y_texture: None,
             uv_texture: None,
             bind_group: None,
             frame_dims: None,
+            last_colorimetry: None,
             window,
         })
+    }
+
+    pub fn set_sharpness(&mut self, sharpness: f32) {
+        self.sharpness = sharpness;
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -281,6 +407,10 @@ impl Renderer {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: self.uniform_buffer.as_entire_binding(),
+                },
             ],
         });
 
@@ -292,6 +422,24 @@ impl Renderer {
 
     pub fn upload_frame(&mut self, frame: &Frame) {
         self.ensure_textures(frame.width, frame.height);
+
+        // Surface VUI changes from the H.264 stream. The JetKVM is known to
+        // shift its signalled colorimetry a few frames into a session (cause
+        // unknown — most likely an HDMI receiver handshake on the device).
+        // Logging each change pins down whether the visible colour shift the
+        // user sees corresponds to a matrix/range flip.
+        let current = (frame.matrix, frame.range);
+        if self.last_colorimetry != Some(current) {
+            info!(
+                "stream colorimetry: matrix={:?} range={:?} ({}x{})",
+                frame.matrix, frame.range, frame.width, frame.height
+            );
+            self.last_colorimetry = Some(current);
+        }
+
+        let uniforms = ShaderUniforms::from_frame(frame, self.sharpness);
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::bytes_of(&uniforms));
 
         let y_tex = self.y_texture.as_ref().unwrap();
         let uv_tex = self.uv_texture.as_ref().unwrap();

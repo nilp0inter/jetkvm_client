@@ -9,6 +9,37 @@ use gstreamer_video::prelude::*;
 use tokio::sync::watch;
 use tracing::{debug, warn};
 
+/// YUV→RGB matrix selected by the source's colorimetry signalling. Each
+/// variant is (Kr, Kb); Kg is derived as `1 - Kr - Kb`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColorMatrix {
+    /// SDTV / sub-HD: BT.601 (Kr=0.299, Kb=0.114).
+    Bt601,
+    /// HD: BT.709 (Kr=0.2126, Kb=0.0722).
+    Bt709,
+    /// UHD/HDR: BT.2020 (Kr=0.2627, Kb=0.0593).
+    Bt2020,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColorRange {
+    /// Y in [16,235], CbCr in [16,240]. Standard for broadcast / most H.264.
+    Limited,
+    /// Y in [0,255], CbCr in [0,255]. Common for screen-capture sources.
+    Full,
+}
+
+impl ColorMatrix {
+    /// Returns (Kr, Kb) for use in the YUV→RGB shader.
+    pub fn coefficients(self) -> (f32, f32) {
+        match self {
+            ColorMatrix::Bt601 => (0.299, 0.114),
+            ColorMatrix::Bt709 => (0.2126, 0.0722),
+            ColorMatrix::Bt2020 => (0.2627, 0.0593),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Frame {
     pub width: u32,
@@ -17,6 +48,8 @@ pub struct Frame {
     pub stride_uv: u32,
     pub y_plane: Vec<u8>,
     pub uv_plane: Vec<u8>,
+    pub matrix: ColorMatrix,
+    pub range: ColorRange,
 }
 
 pub struct StreamingPipeline {
@@ -117,6 +150,23 @@ impl StreamingPipeline {
                     let y_plane = y_data.to_vec();
                     let uv_plane = uv_data.to_vec();
 
+                    // Honor the colorimetry signalled in the stream's VUI
+                    // metadata (H.264 → GstVideoInfo). Fall back to a
+                    // resolution-based heuristic when the source leaves it
+                    // unspecified: HD+ → BT.709, sub-HD → BT.601.
+                    let colorimetry = info.colorimetry();
+                    let matrix = match colorimetry.matrix() {
+                        gst_video::VideoColorMatrix::Bt601 => ColorMatrix::Bt601,
+                        gst_video::VideoColorMatrix::Bt709 => ColorMatrix::Bt709,
+                        gst_video::VideoColorMatrix::Bt2020 => ColorMatrix::Bt2020,
+                        _ if width >= 1280 || height >= 720 => ColorMatrix::Bt709,
+                        _ => ColorMatrix::Bt601,
+                    };
+                    let range = match colorimetry.range() {
+                        gst_video::VideoColorRange::Range0_255 => ColorRange::Full,
+                        _ => ColorRange::Limited,
+                    };
+
                     let f = Frame {
                         width,
                         height,
@@ -124,6 +174,8 @@ impl StreamingPipeline {
                         stride_uv,
                         y_plane,
                         uv_plane,
+                        matrix,
+                        range,
                     };
 
                     let _ = frame_tx_cb.send(Some(f));
