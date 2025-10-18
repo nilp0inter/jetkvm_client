@@ -49,7 +49,19 @@ pub async fn connect(
     let peer_connection = Arc::new(webrtc_api.new_peer_connection(config_rtc).await?);
     debug!("PeerConnection created.");
 
-    // 3. Create a DataChannel named "rpc".
+    // 3. Add video transceiver to request video stream
+    peer_connection
+        .add_transceiver_from_kind(
+            webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
+            Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
+                direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
+                send_encodings: vec![],
+            }),
+        )
+        .await?;
+    debug!("Video transceiver added.");
+
+    // 4. Create a DataChannel named "rpc".
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
     data_channel.on_open(Box::new(move || {
         Box::pin(async move {

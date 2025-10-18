@@ -33,6 +33,7 @@ pub struct JetKvmRpcClient {
     pub http_client: Option<Client>,
     pub auth_token: Option<String>,
     pub rpc_client: Option<RpcClient>,
+    pub serial_client: Option<Arc<RTCDataChannel>>,
     pub peer_connection: Option<Arc<RTCPeerConnection>>,
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
     pub signaling_method: SignalingMethod,
@@ -57,6 +58,7 @@ impl JetKvmRpcClient {
             http_client: None,
             auth_token: None,
             rpc_client: None,
+            serial_client: None,
             peer_connection: None,
             screen_size: Arc::new(Mutex::new(None)),
             signaling_method,
@@ -150,10 +152,11 @@ impl JetKvmRpcClient {
     }
 
     /// Creates a new serial data channel.
-    pub async fn create_serial_channel(&self) -> AnyResult<Arc<RTCDataChannel>> {
+    pub async fn create_serial_channel(&mut self) -> AnyResult<Arc<RTCDataChannel>> {
         match &self.peer_connection {
             Some(pc) => {
                 let serial_channel = pc.create_data_channel("serial", None).await?;
+                self.serial_client = Some(serial_channel.clone());
                 serial_channel.on_open(Box::new(move || {
                     Box::pin(async move {
                         debug!("✅ DataChannel 'serial' is now open!");
@@ -166,42 +169,7 @@ impl JetKvmRpcClient {
             )),
         }
     }
-
-    /// Adds a video transceiver to the peer connection.
-    pub async fn add_video_transceiver(&self) -> AnyResult<()> {
-        match &self.peer_connection {
-            Some(pc) => {
-                pc.add_transceiver_from_kind(
-                    webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
-                    Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
-                        direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
-                        send_encodings: vec![],
-                    }),
-                )
-                .await?;
-                debug!("Video transceiver added.");
-                Ok(())
-            }
-            None => Err(anyhow!(
-                "Peer connection is not available. Call `connect()` first."
-            )),
-        }
-    }
-
     /// Asynchronous logout function for normal use.
-
-    pub async fn remove_video_track(&self) -> AnyResult<()> {
-        if let Some(pc) = &self.peer_connection {
-            let senders = pc.get_senders().await;
-            for sender in senders {
-                if sender.track().await.unwrap().kind() == webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video {
-                    pc.remove_track(&sender).await?;
-                }
-            }
-        }
-        Ok(())
-    }
-
     pub async fn logout(&self) -> AnyResult<()> {
         if let Some(client) = &self.http_client {
             let url = format!("http://{}/auth/logout", self.host);

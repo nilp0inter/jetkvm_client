@@ -572,9 +572,7 @@ async fn main() -> AnyResult<()> {
                     .map(|_| json!({ "status": "ok" }))
             }
             Commands::Screenshot { output } => {
-                client.add_video_transceiver().await?;
-                client.video_capture.wait_for_track().await?;
-                let result = client
+                client
                     .video_capture
                     .capture_screenshot_png()
                     .await
@@ -598,9 +596,7 @@ async fn main() -> AnyResult<()> {
                         }
 
                         Ok(result)
-                    });
-                client.remove_video_track().await?;
-                result
+                    })
             }
             Commands::Wait { milliseconds } => {
                 tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;

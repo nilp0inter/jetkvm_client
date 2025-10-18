@@ -8,7 +8,7 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::header, protocol::Message},
 };
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use webrtc::{
     api::{media_engine::MediaEngine, APIBuilder},
     data_channel::RTCDataChannel,
@@ -132,10 +132,22 @@ pub async fn connect(
         return Err(anyhow!("Failed to read device-metadata from websocket."));
     }
 
-    // 3. Create DataChannel
+    // 3. Add video transceiver to request video stream
+    peer_connection
+        .add_transceiver_from_kind(
+            webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
+            Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
+                direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
+                send_encodings: vec![],
+            }),
+        )
+        .await?;
+    debug!("Video transceiver added.");
+
+    // 4. Create DataChannel
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
 
-    // 4. Create offer and send it
+    // 5. Create offer and send it
     let offer = peer_connection.create_offer(None).await?;
     peer_connection.set_local_description(offer.clone()).await?;
 
