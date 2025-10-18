@@ -296,6 +296,32 @@ pub async fn send_windows_key(client: &crate::jetkvm_rpc_client::JetKvmRpcClient
     Ok(())
 }
 
+/// Sends a Ctrl-Cmd-Q keyboard event to lock a macOS screen.
+pub async fn send_ctrl_cmd_q(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
+    // Press Ctrl-Cmd-Q: 'Q' has HID code 0x14, with Ctrl (0x01) and Command (0x08) modifiers.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [0x14],
+                "modifier": 0x09,
+            }),
+        )
+        .await?;
+    sleep(Duration::from_millis(100)).await;
+    // Release keys.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [],
+                "modifier": 0,
+            }),
+        )
+        .await?;
+    Ok(())
+}
+
 /// Represents a key combination for a remote KVM device.
 ///
 /// This struct defines the information required to simulate a key press event:

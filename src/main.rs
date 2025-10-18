@@ -30,8 +30,8 @@ use serde_json::{json, Value};
 use jetkvm_client::keyboard::{
     rpc_get_key_down_state, rpc_get_keyboard_layout, rpc_get_keyboard_led_state,
     rpc_keyboard_report, rpc_sendtext, rpc_set_keyboard_layout, send_ctrl_a, send_ctrl_c,
-    send_ctrl_v, send_ctrl_x, send_key_combinations, send_return, send_text_with_layout,
-    send_windows_key, KeyCombo,
+    send_ctrl_cmd_q, send_ctrl_v, send_ctrl_x, send_key_combinations, send_return,
+    send_text_with_layout, send_windows_key, KeyCombo,
 };
 use jetkvm_client::mouse::{
     rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_left_click_and_drag_to_center,
@@ -154,6 +154,9 @@ enum Commands {
     /// Sends a Windows key press.
     #[command(name = "send-windows-key")]
     SendWindowsKey,
+    /// Sends a Ctrl-Cmd-Q key press to lock a macOS screen.
+    #[command(name = "send-ctrl-cmd-q")]
+    SendCtrlCmdQ,
     /// Sends a sequence of key combinations (JSON format).
     #[command(name = "send-key-combinations")]
     SendKeyCombinations { combos: String },
@@ -534,6 +537,9 @@ async fn main() -> AnyResult<()> {
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::SendWindowsKey => send_windows_key(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlCmdQ => send_ctrl_cmd_q(&client)
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::SendKeyCombinations { combos } => {
