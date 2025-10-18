@@ -787,7 +787,12 @@ async fn main() -> AnyResult<()> {
             } => rpc_set_serial_settings(&client, &baud_rate, &data_bits, &stop_bits, &parity)
                 .await
                 .map(|_| json!({ "status": "ok" })),
-            Commands::OpenConsole => open_console(&client).await,
+            Commands::OpenConsole => {
+                let serial_channel = client.create_serial_channel().await?;
+                let result = open_console(serial_channel.clone()).await;
+                let _ = serial_channel.close().await;
+                result
+            }
         };
 
         match result {
