@@ -3,19 +3,22 @@ use gstreamer as gst;
 use gstreamer::prelude::*;
 use gstreamer_app as gst_app;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Notify};
+use tokio::time::{timeout, Duration};
 use tracing::info;
 use webrtc::track::track_remote::TrackRemote;
 
 #[derive(Clone)]
 pub struct VideoFrameCapture {
     track: Arc<Mutex<Option<Arc<TrackRemote>>>>,
+    notify: Arc<Notify>,
 }
 
 impl VideoFrameCapture {
     pub fn new() -> Self {
         Self {
             track: Arc::new(Mutex::new(None)),
+            notify: Arc::new(Notify::new()),
         }
     }
 
@@ -26,6 +29,17 @@ impl VideoFrameCapture {
         );
         let mut t = self.track.lock().await;
         *t = Some(track);
+        self.notify.notify_one();
+    }
+
+    pub async fn wait_for_track(&self) -> AnyResult<()> {
+        if self.has_track().await {
+            return Ok(());
+        }
+        timeout(Duration::from_secs(5), self.notify.notified())
+            .await
+            .map_err(|_| anyhow!("Timeout waiting for video track"))?;
+        Ok(())
     }
 
     pub async fn has_track(&self) -> bool {

@@ -572,21 +572,23 @@ async fn main() -> AnyResult<()> {
                     .map(|_| json!({ "status": "ok" }))
             }
             Commands::Screenshot { output } => {
-                client
+                client.add_video_transceiver().await?;
+                client.video_capture.wait_for_track().await?;
+                let result = client
                     .video_capture
                     .capture_screenshot_png()
                     .await
                     .and_then(|png_data| {
                         let base64_data = general_purpose::STANDARD.encode(&png_data);
                         let data_url = format!("data:image/png;base64,{}", base64_data);
-                        
+
                         let mut result = json!({
                             "status": "ok",
                             "format": "png",
                             "size": png_data.len(),
                             "data": data_url
                         });
-                        
+
                         if let Some(output_path) = output {
                             let mut file = File::create(&output_path)
                                 .map_err(|e| anyhow::anyhow!("Failed to create output file: {}", e))?;
@@ -594,9 +596,11 @@ async fn main() -> AnyResult<()> {
                                 .map_err(|e| anyhow::anyhow!("Failed to write to output file: {}", e))?;
                             result["saved_to"] = json!(output_path);
                         }
-                        
+
                         Ok(result)
-                    })
+                    });
+                client.remove_video_track().await?;
+                result
             }
             Commands::Wait { milliseconds } => {
                 tokio::time::sleep(tokio::time::Duration::from_millis(milliseconds)).await;
@@ -787,7 +791,10 @@ async fn main() -> AnyResult<()> {
             } => rpc_set_serial_settings(&client, &baud_rate, &data_bits, &stop_bits, &parity)
                 .await
                 .map(|_| json!({ "status": "ok" })),
-            Commands::OpenConsole => open_console(&client).await,
+            Commands::OpenConsole => {
+                let serial_channel = client.create_serial_channel().await?;
+                open_console(serial_channel).await
+            }
         };
 
         match result {

@@ -8,7 +8,7 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::header, protocol::Message},
 };
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use webrtc::{
     api::{media_engine::MediaEngine, APIBuilder},
     data_channel::RTCDataChannel,
@@ -52,11 +52,7 @@ enum SignalingMessage {
 pub async fn connect(
     host: &str,
     auth_token: Option<&str>,
-) -> AnyResult<(
-    Arc<RTCPeerConnection>,
-    Arc<RTCDataChannel>,
-    Arc<RTCDataChannel>,
-)> {
+) -> AnyResult<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>)> {
     let url = format!("ws://{}/webrtc/signaling/client", host);
 
     let (ws_stream, _) = if let Some(token) = auth_token {
@@ -136,28 +132,10 @@ pub async fn connect(
         return Err(anyhow!("Failed to read device-metadata from websocket."));
     }
 
-    // 3. Add video transceiver to request video stream
-    peer_connection
-        .add_transceiver_from_kind(
-            webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video,
-            Some(webrtc::rtp_transceiver::RTCRtpTransceiverInit {
-                direction: webrtc::rtp_transceiver::rtp_transceiver_direction::RTCRtpTransceiverDirection::Recvonly,
-                send_encodings: vec![],
-            }),
-        )
-        .await?;
-    debug!("Video transceiver added.");
-
-    // 4. Create DataChannel
+    // 3. Create DataChannel
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
-    let serial_channel = peer_connection.create_data_channel("serial", None).await?;
-    serial_channel.on_open(Box::new(move || {
-        Box::pin(async move {
-            debug!("✅ DataChannel 'serial' is now open!");
-        })
-    }));
 
-    // 5. Create offer and send it
+    // 4. Create offer and send it
     let offer = peer_connection.create_offer(None).await?;
     peer_connection.set_local_description(offer.clone()).await?;
 
@@ -205,7 +183,7 @@ pub async fn connect(
         }
     });
 
-    Ok((peer_connection, data_channel, serial_channel))
+    Ok((peer_connection, data_channel))
 }
 
 #[cfg(test)]
