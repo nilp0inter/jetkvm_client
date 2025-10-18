@@ -7,11 +7,12 @@ use clap::ValueEnum;
 use reqwest::Client;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{watch, Mutex};
 use tokio::time::Duration;
 use tracing::{debug, info, warn};
 
 use webrtc::data_channel::RTCDataChannel;
+use webrtc::track::track_remote::TrackRemote;
 
 #[derive(Clone, Debug, Default, ValueEnum)]
 pub enum SignalingMethod {
@@ -38,6 +39,8 @@ pub struct JetKvmRpcClient {
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
     pub signaling_method: SignalingMethod,
     pub video_capture: Arc<VideoFrameCapture>,
+    video_track_tx: watch::Sender<Option<Arc<TrackRemote>>>,
+    video_track_rx: watch::Receiver<Option<Arc<TrackRemote>>>,
 }
 
 impl JetKvmRpcClient {
@@ -50,6 +53,7 @@ impl JetKvmRpcClient {
         signaling_method: SignalingMethod,
     ) -> Self {
         debug!("Initializing JetKvmRpcClient with host: {}", host);
+        let (video_track_tx, video_track_rx) = watch::channel(None);
         Self {
             host,
             password,
@@ -63,7 +67,17 @@ impl JetKvmRpcClient {
             screen_size: Arc::new(Mutex::new(None)),
             signaling_method,
             video_capture: Arc::new(VideoFrameCapture::new()),
+            video_track_tx,
+            video_track_rx,
         }
+    }
+
+    /// Returns a `watch::Receiver` that receives the remote video `TrackRemote`
+    /// once the WebRTC `on_track` callback fires. Useful for the viewer, which
+    /// reads RTP packets directly off the track and feeds them into its own
+    /// streaming GStreamer pipeline.
+    pub fn video_track_watcher(&self) -> watch::Receiver<Option<Arc<TrackRemote>>> {
+        self.video_track_rx.clone()
     }
 
     /// Connects the client to the JetKVM service.
@@ -99,13 +113,16 @@ impl JetKvmRpcClient {
         };
 
         let video_capture = Arc::clone(&self.video_capture);
+        let video_track_tx = self.video_track_tx.clone();
         peer_connection.on_track(Box::new(move |track, _, _| {
             let video_capture = Arc::clone(&video_capture);
+            let video_track_tx = video_track_tx.clone();
             Box::pin(async move {
                 debug!("Received track: kind={}", track.kind());
                 if track.kind() == webrtc::rtp_transceiver::rtp_codec::RTPCodecType::Video {
                     debug!("Setting video track for capture");
-                    video_capture.set_track(track).await;
+                    video_capture.set_track(track.clone()).await;
+                    let _ = video_track_tx.send(Some(track));
                 }
             })
         }));

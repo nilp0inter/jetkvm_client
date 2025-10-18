@@ -21,6 +21,7 @@ pub mod system;
 pub mod text_to_macro;
 pub mod usb;
 pub mod video;
+pub mod viewer;
 pub mod wol;
 
 pub use jetkvm_rpc_client::JetKvmRpcClient;
