@@ -11,6 +11,9 @@ use tokio::sync::Mutex;
 use tokio::time::Duration;
 use tracing::{debug, info, warn};
 
+use bytes::Bytes;
+use webrtc::data_channel::RTCDataChannel;
+
 #[derive(Clone, Debug, Default, ValueEnum)]
 pub enum SignalingMethod {
     #[default]
@@ -29,6 +32,7 @@ pub struct JetKvmRpcClient {
     pub http_client: Option<Client>,
     pub auth_token: Option<String>,
     pub rpc_client: Option<RpcClient>,
+    pub serial_client: Option<Arc<RTCDataChannel>>,
     pub screen_size: Arc<Mutex<Option<(u32, u32)>>>,
     pub signaling_method: SignalingMethod,
     pub video_capture: Arc<VideoFrameCapture>,
@@ -52,6 +56,7 @@ impl JetKvmRpcClient {
             http_client: None,
             auth_token: None,
             rpc_client: None,
+            serial_client: None,
             screen_size: Arc::new(Mutex::new(None)),
             signaling_method,
             video_capture: Arc::new(VideoFrameCapture::new()),
@@ -68,7 +73,7 @@ impl JetKvmRpcClient {
         self.http_client = Some(http_client.clone());
         self.auth_token = auth_token;
 
-        let (peer_connection, data_channel) = match self.signaling_method {
+        let (peer_connection, rpc_channel, serial_channel) = match self.signaling_method {
             SignalingMethod::Legacy => legacy::connect(&http_client, &self.host, &self.api).await?,
             SignalingMethod::WebSocket => {
                 websocket::connect(&self.host, self.auth_token.as_deref()).await?
@@ -102,9 +107,10 @@ impl JetKvmRpcClient {
             })
         }));
 
-        let rpc_client = RpcClient::new(data_channel);
+        let rpc_client = RpcClient::new(rpc_channel);
         rpc_client.install_message_handler();
         self.rpc_client = Some(rpc_client);
+        self.serial_client = Some(serial_channel);
 
         debug!("JetKvmRpcClient connected successfully.");
         Ok(())
@@ -116,6 +122,19 @@ impl JetKvmRpcClient {
             Some(rpc) => rpc.send_rpc(method, params).await,
             None => Err(anyhow!(
                 "RPC client is not connected. Call `connect()` first."
+            )),
+        }
+    }
+
+    /// Sends raw data over the serial data channel.
+    pub async fn send_serial(&self, data: &[u8]) -> AnyResult<()> {
+        match &self.serial_client {
+            Some(serial) => {
+                serial.send(&Bytes::from(data.to_vec())).await?;
+                Ok(())
+            }
+            None => Err(anyhow!(
+                "Serial client is not connected. Call `connect()` first."
             )),
         }
     }

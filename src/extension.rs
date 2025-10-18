@@ -46,3 +46,42 @@ pub async fn rpc_set_serial_settings(
         )
         .await
 }
+
+pub async fn rpc_set_atx_power_action(client: &JetKvmRpcClient, action: &str) -> AnyResult<Value> {
+    client
+        .send_rpc(
+            "setATXPowerAction",
+            json!({
+                "action": action
+            }),
+        )
+        .await
+}
+
+pub async fn rpc_get_dc_power_state(client: &JetKvmRpcClient) -> AnyResult<Value> {
+    client.send_rpc("getDCPowerState", json!({})).await
+}
+
+pub async fn rpc_set_dc_power_state(client: &JetKvmRpcClient, enabled: bool) -> AnyResult<Value> {
+    client
+        .send_rpc(
+            "setDCPowerState",
+            json!({
+                "enabled": enabled
+            }),
+        )
+        .await
+}
+
+pub async fn rpc_set_dc_restore_state(client: &JetKvmRpcClient, state: u8) -> AnyResult<Value> {
+    client
+        .send_rpc(
+            "setDCRestoreState",
+            json!({
+                "state": state
+            }),
+        )
+        .await
+}
+            
+            

@@ -52,7 +52,11 @@ enum SignalingMessage {
 pub async fn connect(
     host: &str,
     auth_token: Option<&str>,
-) -> AnyResult<(Arc<RTCPeerConnection>, Arc<RTCDataChannel>)> {
+) -> AnyResult<(
+    Arc<RTCPeerConnection>,
+    Arc<RTCDataChannel>,
+    Arc<RTCDataChannel>,
+)> {
     let url = format!("ws://{}/webrtc/signaling/client", host);
 
     let (ws_stream, _) = if let Some(token) = auth_token {
@@ -146,9 +150,10 @@ pub async fn connect(
 
     // 4. Create DataChannel
     let data_channel = peer_connection.create_data_channel("rpc", None).await?;
-    data_channel.on_open(Box::new(move || {
+    let serial_channel = peer_connection.create_data_channel("serial", None).await?;
+    serial_channel.on_open(Box::new(move || {
         Box::pin(async move {
-            debug!("✅ DataChannel 'rpc' is now open!");
+            debug!("✅ DataChannel 'serial' is now open!");
         })
     }));
 
@@ -200,7 +205,7 @@ pub async fn connect(
         }
     });
 
-    Ok((peer_connection, data_channel))
+    Ok((peer_connection, data_channel, serial_channel))
 }
 
 #[cfg(test)]

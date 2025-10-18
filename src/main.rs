@@ -12,6 +12,7 @@ use jetkvm_client::cloud::{
     rpc_deregister_device, rpc_get_cloud_state, rpc_get_tls_state, rpc_set_cloud_url,
     rpc_set_tls_state,
 };
+use jetkvm_client::console::open_console;
 use jetkvm_client::device::{rpc_get_device_id, rpc_ping};
 use jetkvm_client::extension::{
     rpc_get_active_extension, rpc_get_serial_settings, rpc_set_active_extension,
@@ -427,10 +428,15 @@ enum Commands {
         stop_bits: String,
         parity: String,
     },
+    /// Opens an interactive serial console.
+    #[command(name = "open-console")]
+    OpenConsole,
 }
+
 
 #[tokio::main]
 async fn main() -> AnyResult<()> {
+    
     // Install the default crypto provider for rustls
     #[cfg(feature = "tls")]
     rustls::crypto::aws_lc_rs::default_provider()
@@ -781,6 +787,7 @@ async fn main() -> AnyResult<()> {
             } => rpc_set_serial_settings(&client, &baud_rate, &data_bits, &stop_bits, &parity)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::OpenConsole => open_console(&client).await,
         };
 
         match result {
