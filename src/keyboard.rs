@@ -128,6 +128,66 @@ pub async fn send_text_with_layout(
     Ok(())
 }
 
+/// Sends a Escape (esc) key press then releases it.
+pub async fn send_esc(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
+    // Press Escape (keycode 0x29) with no modifier (0)
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [0x29],
+                "modifier": 0
+            }),
+        )
+        .await?;
+
+    // Wait a short period to simulate a key press duration.
+    sleep(Duration::from_millis(100)).await;
+
+    // Release all keys.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [],
+                "modifier": 0
+            }),
+        )
+        .await?;
+
+    Ok(())
+}
+
+/// Sends a Delete (del) key press then releases it.
+pub async fn send_del(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
+    // Press Delete (keycode 0x63) with no modifier (0) or (keycode 0x4c) didn't work with 4c 
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [0x63],
+                "modifier": 0
+            }),
+        )
+        .await?;
+
+    // Wait a short period to simulate a key press duration.
+    sleep(Duration::from_millis(100)).await;
+
+    // Release all keys.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [],
+                "modifier": 0
+            }),
+        )
+        .await?;
+
+    Ok(())
+}
+
 /// Sends a Return (Enter) key press then releases it.
 pub async fn send_return(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
     // Press Return (keycode 0x28)
@@ -296,6 +356,32 @@ pub async fn send_windows_key(client: &crate::jetkvm_rpc_client::JetKvmRpcClient
     Ok(())
 }
 
+/// Sends a Win-L keyboard event to lock a Windows screen.
+pub async fn send_windows_l(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
+    // Press Win-L: 'L' has HID code 0x0f, with Win (0x08) modifier.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [0x0f],
+                "modifier": 0x08,
+            }),
+        )
+        .await?;
+    sleep(Duration::from_millis(100)).await;
+    // Release keys.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [],
+                "modifier": 0,
+            }),
+        )
+        .await?;
+    Ok(())
+}
+
 /// Sends a Ctrl-Cmd-Q keyboard event to lock a macOS screen.
 pub async fn send_ctrl_cmd_q(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
     // Press Ctrl-Cmd-Q: 'Q' has HID code 0x14, with Ctrl (0x01) and Command (0x08) modifiers.
@@ -305,6 +391,32 @@ pub async fn send_ctrl_cmd_q(client: &crate::jetkvm_rpc_client::JetKvmRpcClient)
             json!({
                 "keys": [0x14],
                 "modifier": 0x09,
+            }),
+        )
+        .await?;
+    sleep(Duration::from_millis(100)).await;
+    // Release keys.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [],
+                "modifier": 0,
+            }),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Sends a Ctrl-Alt-Delete keyboard event 
+pub async fn send_ctrl_alt_delete(client: &crate::jetkvm_rpc_client::JetKvmRpcClient) -> AnyResult<()> {
+    // Press Ctrl-Alt-Delete: 'Delete' has HID code 0x4c, with Ctrl (0x01) and AltLeft (0x04) modifiers.
+    client
+        .send_rpc(
+            "keyboardReport",
+            json!({
+                "keys": [0x4c],
+                "modifier": 0x05,
             }),
         )
         .await?;

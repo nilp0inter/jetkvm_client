@@ -242,6 +242,26 @@ $ jetkvm_client -H 192.168.1.100 -P password send-text-with-layout "España" --l
 .RE
 
 .TP
+.B send-esc
+Send a Escape (esc) key press.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-esc
+.RE
+
+.TP
+.B send-del
+Send a Delete (del) key press.
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-del
+.RE
+
+.TP
 .B send-return
 Send a Return (Enter) key press.
 .br
@@ -299,6 +319,36 @@ Example:
 .br
 .RS
 $ jetkvm_client -H 192.168.1.100 -P password send-windows-key
+.RE
+
+.TP
+.B send-windows-l
+Send a Windows+L event to lock Windows
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-windows-l
+.RE
+
+.TP
+.B send-ctrl-cmd-q
+Send a Ctrl+Cmd+q event to lock macOS
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-cmd-q
+.RE
+
+.TP
+.B send-ctrl-alt-del
+Send a Ctrl+Alt+Del event 
+.br
+Example:
+.br
+.RS
+$ jetkvm_client -H 192.168.1.100 -P password send-ctrl-alt-del
 .RE
 
 .TP
@@ -922,7 +972,7 @@ Enable or disable DC power.
 Arguments:
 .RS
 .IP ENABLED
-Boolean value: true or false
+Boolean value: true or false, on or off
 .RE
 Example:
 .br
@@ -937,9 +987,9 @@ Set the DC power restoration behavior after power loss.
 Arguments:
 .RS
 .IP STATE
-Restoration state configuration
+Restoration state configuration: 0 == off, 1 == on, 2 == laststate
 .RE
-Example:
+Example: 0 == off, 1 == on, 2 == laststate
 .br
 .RS
 $ jetkvm_client -H 192.168.1.100 -P password set-dc-restore-state 1

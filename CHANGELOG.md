@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-03-05
+### Added
+
+- *(cli)* change set-dc-power-state to allow on/off as well as true/false
+
+
+## [1.0.1] - 2026-01-15
+### Added
+
+- *(keyboard)* add send_esc, send_del, send_windows_l, send_ctrl_alt_del API 
+- *(cli)* add send_esc, send_del, send_windows_l, send_ctrl_alt_del commands 
+
 ## [1.0.0] - 2025-10-17
 
 - [**breaking**] project forked to nilp0inter/jetkvm_client and goals changed

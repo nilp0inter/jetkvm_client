@@ -30,8 +30,8 @@ use serde_json::{json, Value};
 use jetkvm_client::keyboard::{
     rpc_get_key_down_state, rpc_get_keyboard_layout, rpc_get_keyboard_led_state,
     rpc_keyboard_report, rpc_sendtext, rpc_set_keyboard_layout, send_ctrl_a, send_ctrl_c,
-    send_ctrl_cmd_q, send_ctrl_v, send_ctrl_x, send_key_combinations, send_return,
-    send_text_with_layout, send_windows_key, KeyCombo,
+    send_ctrl_cmd_q, send_ctrl_alt_delete, send_ctrl_v, send_ctrl_x, send_key_combinations, send_esc, send_del, send_return,
+    send_text_with_layout, send_windows_key, send_windows_l, KeyCombo,
 };
 use jetkvm_client::mouse::{
     rpc_abs_mouse_report, rpc_double_click, rpc_left_click, rpc_left_click_and_drag_to_center,
@@ -136,6 +136,12 @@ enum Commands {
         #[arg(long, default_value = "20")]
         delay: u64,
     },
+    /// Sends a Escape (esc) key press.
+    #[command(name = "send-esc")]
+    SendEscape,
+    /// Sends a Delete (del) key press.
+    #[command(name = "send-del")]
+    SendDel,
     /// Sends a Return (Enter) key press.
     #[command(name = "send-return")]
     SendReturn,
@@ -154,9 +160,15 @@ enum Commands {
     /// Sends a Windows key press.
     #[command(name = "send-windows-key")]
     SendWindowsKey,
+    /// Sends a Ctrl-L key press to lock a Windows screen.
+    #[command(name = "send-windows-l")]
+    SendWindowsL,
     /// Sends a Ctrl-Cmd-Q key press to lock a macOS screen.
     #[command(name = "send-ctrl-cmd-q")]
     SendCtrlCmdQ,
+    /// Sends a Ctrl-Alt-Delete key press.
+    #[command(name = "send-ctrl-alt-delete")]
+    SendCtrlAltDelete,
     /// Sends a sequence of key combinations (JSON format).
     #[command(name = "send-key-combinations")]
     SendKeyCombinations { combos: String },
@@ -256,12 +268,15 @@ enum Commands {
     /// Sets DC power state.
     #[command(name = "set-dc-power-state")]
     SetDcPowerState {
-        #[arg(action = ArgAction::Set)]
+        #[arg(action = ArgAction::Set, value_parser = parse_bool)]
         enabled: bool,
     },
     /// Sets DC restore state.
     #[command(name = "set-dc-restore-state")]
-    SetDcRestoreState { state: u64 },
+    SetDcRestoreState {
+        #[arg(action = ArgAction::Set, value_parser = parse_dc_restore_state)]
+        state: u64,
+    },
     /// Gets USB configuration.
     #[command(name = "get-usb-config")]
     GetUsbConfig,
@@ -436,7 +451,22 @@ enum Commands {
     OpenConsole,
 }
 
+fn parse_bool(s: &str) -> Result<bool, String> {
+    match s.to_lowercase().as_str() {
+        "true" | "on" => Ok(true),
+        "false" | "off" => Ok(false),
+        _ => Err(format!("Invalid boolean value: {}. Valid values are: true, false, on, off", s)),
+    }
+}
 
+fn parse_dc_restore_state(s: &str) -> Result<u64, String> {
+    match s.to_lowercase().as_str() {
+        "off" => Ok(0),
+        "on" => Ok(1),
+        "laststate" => Ok(2),
+        _ => Err(format!("Invalid DC restore state: {}. Valid values are: off, on, laststate", s)),
+    }
+}
 #[tokio::main]
 async fn main() -> AnyResult<()> {
     
@@ -521,6 +551,12 @@ async fn main() -> AnyResult<()> {
             } => send_text_with_layout(&client, &text, &layout, delay)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::SendEscape => send_esc(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendDel => send_del(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
             Commands::SendReturn => send_return(&client)
                 .await
                 .map(|_| json!({ "status": "ok" })),
@@ -539,7 +575,13 @@ async fn main() -> AnyResult<()> {
             Commands::SendWindowsKey => send_windows_key(&client)
                 .await
                 .map(|_| json!({ "status": "ok" })),
+            Commands::SendWindowsL => send_windows_l(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
             Commands::SendCtrlCmdQ => send_ctrl_cmd_q(&client)
+                .await
+                .map(|_| json!({ "status": "ok" })),
+            Commands::SendCtrlAltDelete => send_ctrl_alt_delete(&client)
                 .await
                 .map(|_| json!({ "status": "ok" })),
             Commands::SendKeyCombinations { combos } => {
