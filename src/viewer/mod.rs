@@ -1,6 +1,6 @@
 //! GUI viewer support modules.
 //!
-//! Pulled into the `jetkvm_viewer` binary; not used by the CLI.
+//! Pulled into the `Desktop` binary; not used by the CLI.
 
 pub mod edid;
 pub mod input;

@@ -1,4 +1,6 @@
-//! `jetkvm_viewer` — borderless fullscreen viewer for a JetKVM device.
+//! `Desktop` — borderless fullscreen viewer for a JetKVM device.
+
+#![allow(non_snake_case)]
 
 use std::sync::Arc;
 use std::thread;
@@ -50,7 +52,7 @@ const RECONNECT_DELAY: Duration = Duration::from_secs(5);
 const FRAME_WATCHDOG: Duration = Duration::from_secs(5);
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "jetkvm_viewer", version, about = "JetKVM live viewer")]
+#[command(name = "Desktop", version, about = "JetKVM live viewer")]
 struct Args {
     #[arg(short = 'H', long)]
     host: String,
@@ -345,7 +347,7 @@ fn install_logging(debug: bool) {
     let filter = if debug {
         EnvFilter::new(
             "jetkvm_client=debug,\
-             jetkvm_viewer=debug,\
+             Desktop=debug,\
              info,\
              wgpu_hal::vulkan::instance=warn",
         )
@@ -353,7 +355,7 @@ fn install_logging(debug: bool) {
         EnvFilter::try_from_default_env().unwrap_or_else(|_| {
             EnvFilter::new(
                 "warn,\
-                 jetkvm_viewer=info,\
+                 Desktop=info,\
                  jetkvm_client::jetkvm_rpc_client=info,\
                  wgpu_hal::vulkan::instance=off",
             )

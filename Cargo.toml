@@ -13,7 +13,7 @@ name = "jetkvm_client"
 path = "src/lib.rs"
 
 [[bin]]
-name = "jetkvm_viewer"
+name = "Desktop"
 path = "src/bin/viewer.rs"
 
 [features]

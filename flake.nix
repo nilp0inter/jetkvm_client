@@ -78,22 +78,22 @@
 EOF
                 fi
 
-                if [ -f "target/debug/jetkvm_viewer" ]; then
-                  echo "Creating JetKVM.app bundle..."
-                  mkdir -p JetKVM.app/Contents/MacOS
-                  cp target/debug/jetkvm_viewer JetKVM.app/Contents/MacOS/JetKVM
-                  
-                  cat <<EOF > JetKVM.app/Contents/Info.plist
+                if [ -f "target/debug/Desktop" ]; then
+                  echo "Creating Desktop.app bundle..."
+                  mkdir -p Desktop.app/Contents/MacOS
+                  cp target/debug/Desktop Desktop.app/Contents/MacOS/Desktop
+
+                  cat <<EOF > Desktop.app/Contents/Info.plist
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>JetKVM</string>
+    <string>Desktop</string>
     <key>CFBundleIdentifier</key>
     <string>com.jetkvm.viewer</string>
     <key>CFBundleName</key>
-    <string>JetKVM</string>
+    <string>Desktop</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -103,8 +103,8 @@ EOF
 </dict>
 </plist>
 EOF
-                  echo "Signing JetKVM.app bundle..."
-                  codesign --force --deep --entitlements "$ENT" -s - JetKVM.app
+                  echo "Signing Desktop.app bundle..."
+                  codesign --force --deep --entitlements "$ENT" -s - Desktop.app
                 fi
 
                 if [ -f "target/debug/jetkvm_client" ]; then
@@ -113,8 +113,8 @@ EOF
                 fi
               }
               export -f sign_jetkvm
-              echo "macOS detected: Use 'sign_jetkvm' to sign binaries and create JetKVM.app to fix Local Network permissions."
-              echo "To trigger permissions, run: open JetKVM.app --args -H <HOST> -P <PWD>"
+              echo "macOS detected: Use 'sign_jetkvm' to sign binaries and create Desktop.app to fix Local Network permissions."
+              echo "To trigger permissions, run: open Desktop.app --args -H <HOST> -P <PWD>"
             ''}
           '';
         };

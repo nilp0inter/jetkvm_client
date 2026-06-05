@@ -56,7 +56,7 @@ This project provides a **Nix-native workflow** to handle this:
    ```
 
 3. **Sign and bundle the binaries:**
-   This helper command (available in the nix shell) creates a `JetKVM.app` bundle and applies the necessary code signatures and entitlements.
+   This helper command (available in the nix shell) creates a `Desktop.app` bundle and applies the necessary code signatures and entitlements.
    ```bash
    sign_jetkvm
    ```
@@ -64,13 +64,13 @@ This project provides a **Nix-native workflow** to handle this:
 4. **Trigger the "Local Network" permission:**
    Run the following command **once** to force macOS to show the permission dialog. Click **"Allow"** when prompted.
    ```bash
-   open JetKVM.app --args -H <HOST> -P <PASSWORD>
+   open Desktop.app --args -H <HOST> -P <PASSWORD>
    ```
 
 5. **Run normally:**
    After permission is granted, you can use the binaries normally via `cargo run`:
    ```bash
-   cargo run --bin jetkvm_viewer -- -H <HOST> -P <PASSWORD>
+   cargo run --bin Desktop -- -H <HOST> -P <PASSWORD>
    ```
   
 ## Usage
