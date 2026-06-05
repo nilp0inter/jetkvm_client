@@ -1,5 +1,6 @@
 target/
-
+entitlements.plist
+JetKVM.app/
 
 ### Created by https://www.gitignore.io
 ### direnv ###

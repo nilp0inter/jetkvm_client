@@ -38,6 +38,40 @@ The goal of this library is to be able to do programatically whatever a jetkvm u
      ```bash
      cargo run -- -H 192.168.1.100 -P mypassword
      ```
+
+## macOS Support
+
+On macOS (specifically Sequoia and later), unsigned command-line tools are often blocked from accessing the local network without a prompt, resulting in `No route to host (os error 65)`.
+
+This project provides a **Nix-native workflow** to handle this:
+
+1. **Enter the development environment:**
+   ```bash
+   nix develop
+   ```
+
+2. **Build the project:**
+   ```bash
+   cargo build
+   ```
+
+3. **Sign and bundle the binaries:**
+   This helper command (available in the nix shell) creates a `JetKVM.app` bundle and applies the necessary code signatures and entitlements.
+   ```bash
+   sign_jetkvm
+   ```
+
+4. **Trigger the "Local Network" permission:**
+   Run the following command **once** to force macOS to show the permission dialog. Click **"Allow"** when prompted.
+   ```bash
+   open JetKVM.app --args -H <HOST> -P <PASSWORD>
+   ```
+
+5. **Run normally:**
+   After permission is granted, you can use the binaries normally via `cargo run`:
+   ```bash
+   cargo run --bin jetkvm_viewer -- -H <HOST> -P <PASSWORD>
+   ```
   
 ## Usage
 
